@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台股彈幕</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 大盤資訊列 -->
+  <header id="ticker">
+    <div class="ticker-name">
+      <span id="index-name">發行量加權股價指數</span>
+      <span id="source-badge" class="badge" hidden>模擬行情</span>
+    </div>
+    <div class="ticker-main">
+      <span id="index-price">—</span>
+      <span id="index-change" class="flat">—</span>
+    </div>
+    <div class="ticker-sub">
+      <span>高 <b id="index-high">—</b></span>
+      <span>低 <b id="index-low">—</b></span>
+      <span>昨收 <b id="index-prev">—</b></span>
+    </div>
+  </header>
+
+  <!-- 彈幕飛行區 -->
+  <main id="danmaku-stage" aria-live="off"></main>
+
+  <!-- 房間資訊 + 輸入列 -->
+  <footer id="composer">
+    <span id="room-badge" class="badge">連線中…</span>
+    <form id="barrage-form" autocomplete="off">
+      <input
+        id="barrage-input"
+        type="text"
+        maxlength="50"
+        placeholder="發個彈幕吧（最多 50 字）"
+      />
+      <button type="submit">發射 🚀</button>
+    </form>
+  </footer>
+
+  <div id="toast" hidden></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

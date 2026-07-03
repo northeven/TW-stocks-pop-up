@@ -1,0 +1,19 @@
+{
+  "name": "tw-stocks-pop-up",
+  "version": "0.1.0",
+  "description": "即時臺灣股市彈幕系統：一邊看大盤，一邊發彈幕",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "SIMULATE=1 node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
