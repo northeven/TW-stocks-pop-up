@@ -1,0 +1,12 @@
+# Render 一鍵部署設定（Blueprint）
+# 在 Render dashboard 選 New → Blueprint，指向這個 repo 即可
+services:
+  - type: web
+    name: tw-stocks-pop-up
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ROOM_CAPACITY
+        value: "100"

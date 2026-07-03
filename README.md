@@ -56,6 +56,22 @@ public/
 { "rooms": 2, "users": 137, "capacity": 100, "marketSource": "twse" }
 ```
 
+## 免費部署（Render）
+
+不需要自己的伺服器，用 [Render](https://render.com) 免費方案就能上線：
+
+1. 用 GitHub 帳號註冊/登入 Render（免信用卡）
+2. Dashboard → **New → Web Service**，選這個 repo
+3. Render 會自動讀取 `render.yaml`，直接按 **Deploy** 即可
+4. 完成後會拿到一個 `https://tw-stocks-pop-up.onrender.com` 之類的網址，分享給朋友就能一起發彈幕
+
+注意事項：
+
+- 免費方案 **15 分鐘沒流量會休眠**，下一個訪客要等約 30–60 秒冷啟動（好玩專案可接受）
+- 免費額度每月 750 小時，單一服務 24 小時開著也夠用（一個月最多 744 小時）
+- 免費方案只有單一實例，剛好符合本專案設計（Socket.IO 不需要 Redis adapter）
+- Render 的伺服器連證交所 API 沒問題，部署後就是真實大盤行情
+
 ## 資料來源
 
 大盤指數來自[臺灣證券交易所基本市況報導網站（MIS）](https://mis.twse.com.tw/)的公開 API，僅供個人趣味用途；請保持合理的輪詢頻率。
