@@ -2,13 +2,14 @@
 // 彈幕只在房間內廣播，控制每則訊息的扇出（fan-out）成本。
 
 export class RoomManager {
-  constructor({ capacity = 100 } = {}) {
+  constructor({ capacity = 100, prefix = '' } = {}) {
     this.capacity = capacity;
+    this.prefix = prefix; // 讓不同頻道的房名不互撞，例如 "tsm:room-1"
     this.counts = new Map(); // roomName -> 目前人數
   }
 
   roomName(i) {
-    return `room-${i}`;
+    return `${this.prefix}room-${i}`;
   }
 
   /** 找出第一個還有空位的房間並入座，回傳房名。 */

@@ -7,10 +7,14 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- 大盤資訊列 -->
+  <!-- 行情資訊列 -->
   <header id="ticker">
+    <nav id="channel-nav">
+      <a href="/" data-channel="taiex">台股大盤</a>
+      <a href="/tsm" data-channel="tsm">美股 TSM</a>
+    </nav>
     <div class="ticker-name">
-      <span id="index-name">發行量加權股價指數</span>
+      <span id="index-name">連線中…</span>
       <span id="source-badge" class="badge" hidden>模擬行情</span>
     </div>
     <div class="ticker-main">
@@ -24,8 +28,10 @@
     </div>
   </header>
 
-  <!-- 彈幕飛行區 -->
-  <main id="danmaku-stage" aria-live="off"></main>
+  <!-- 彈幕飛行區（背景是即時走勢圖） -->
+  <main id="danmaku-stage" aria-live="off">
+    <canvas id="chart" aria-label="大盤即時走勢圖"></canvas>
+  </main>
 
   <!-- 房間資訊 + 輸入列 -->
   <footer id="composer">

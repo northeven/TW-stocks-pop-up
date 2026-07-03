@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { Server } from 'socket.io';
 import { RoomManager } from './rooms.js';
-import { startMarketFeed } from './market.js';
+import { startMarketFeed, fetchTaiex, fetchYahoo } from './market.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 100;
@@ -13,11 +13,62 @@ const SIMULATE = process.env.SIMULATE === '1';
 const MAX_TEXT_LENGTH = 50;
 const RATE_BURST = 3; // 令牌桶：最多連發 3 則
 const RATE_REFILL_MS = 2000; // 之後每 2 秒補一則的額度
+const HISTORY_MAX = 4000; // 每頻道走勢歷史點數上限
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// ---- 頻道：每個頻道有自己的行情來源、走勢歷史、房間 ----
+
+const CHANNEL_CONFIG = {
+  taiex: {
+    fetcher: fetchTaiex,
+    sim: { base: 23000, name: '發行量加權股價指數' },
+  },
+  tsm: {
+    fetcher: () => fetchYahoo('TSM', '台積電 ADR (TSM)'),
+    sim: { base: 250, name: '台積電 ADR (TSM)' },
+  },
+};
+
+const channels = {};
+for (const [key, cfg] of Object.entries(CHANNEL_CONFIG)) {
+  channels[key] = {
+    key,
+    cfg,
+    rooms: new RoomManager({ capacity: ROOM_CAPACITY, prefix: `${key}:` }),
+    history: [], // [timestamp, price]
+    prevClose: null,
+    latest: null,
+  };
+}
+
+function recordQuote(ch, q) {
+  if (ch.prevClose !== q.prevClose) {
+    // 昨收變了代表換交易日，重新開始畫
+    ch.prevClose = q.prevClose;
+    ch.history.length = 0;
+  }
+  // Yahoo 會附當日分線歷史，冷啟動直接整段填入
+  if (ch.history.length === 0 && q.series?.length) {
+    ch.history.push(...q.series);
+  }
+  const last = ch.history[ch.history.length - 1];
+  if (!last || last[0] !== q.time) {
+    ch.history.push([q.time, q.price]); // 收盤後同一筆會重複，去重
+  }
+  if (ch.history.length > HISTORY_MAX) {
+    ch.history.splice(0, ch.history.length - HISTORY_MAX);
+  }
+}
+
+// ---- HTTP ----
+
 const app = express();
 app.use(express.static(path.join(__dirname, '..', 'public')));
+// /tsm 也是同一份前端，客戶端依路徑決定頻道
+app.get('/tsm', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -25,23 +76,33 @@ const io = new Server(server, {
   maxHttpBufferSize: 4096, // 彈幕很短，縮小上限擋掉異常大封包
 });
 
-const rooms = new RoomManager({ capacity: ROOM_CAPACITY });
-let latestQuote = null;
-
 app.get('/stats', (_req, res) => {
-  res.json({
-    rooms: rooms.totalRooms(),
-    users: rooms.totalUsers(),
-    capacity: ROOM_CAPACITY,
-    marketSource: latestQuote?.source ?? null,
-  });
+  const perChannel = {};
+  for (const ch of Object.values(channels)) {
+    perChannel[ch.key] = {
+      rooms: ch.rooms.totalRooms(),
+      users: ch.rooms.totalUsers(),
+      marketSource: ch.latest?.source ?? null,
+    };
+  }
+  res.json({ capacity: ROOM_CAPACITY, channels: perChannel });
 });
 
-// 行情是全站共用的（大家都看大盤），直接對所有連線廣播
-const stopMarket = startMarketFeed((quote) => {
-  latestQuote = quote;
-  io.emit('market', quote);
-}, { simulate: SIMULATE });
+// ---- 行情輪詢：每個頻道一條，全站共用，對該頻道所有連線廣播 ----
+
+const stoppers = Object.values(channels).map((ch) =>
+  startMarketFeed(
+    (quote) => {
+      ch.latest = quote;
+      recordQuote(ch, quote);
+      const { series, ...lean } = quote; // series 很大，只在連線時隨歷史送
+      io.to(`chan:${ch.key}`).emit('market', lean);
+    },
+    { simulate: SIMULATE, fetcher: ch.cfg.fetcher, sim: ch.cfg.sim },
+  ),
+);
+
+// ---- Socket.IO ----
 
 function sanitizeText(raw) {
   if (typeof raw !== 'string') return null;
@@ -52,19 +113,31 @@ function sanitizeText(raw) {
 }
 
 io.on('connection', (socket) => {
-  const room = rooms.assign();
+  const chKey = Object.hasOwn(channels, socket.handshake.query.channel)
+    ? socket.handshake.query.channel
+    : 'taiex';
+  const ch = channels[chKey];
+
+  const room = ch.rooms.assign();
   socket.join(room);
+  socket.join(`chan:${chKey}`);
+  socket.data.channel = chKey;
   socket.data.room = room;
   socket.data.tokens = RATE_BURST;
   socket.data.lastRefill = Date.now();
 
   socket.emit('joined', {
+    channel: chKey,
     room,
-    count: rooms.count(room),
+    count: ch.rooms.count(room),
     capacity: ROOM_CAPACITY,
   });
-  if (latestQuote) socket.emit('market', latestQuote);
-  io.to(room).emit('room-count', { room, count: rooms.count(room) });
+  if (ch.latest) {
+    const { series, ...lean } = ch.latest;
+    socket.emit('market', lean);
+  }
+  socket.emit('market-history', { points: ch.history, prevClose: ch.prevClose });
+  io.to(room).emit('room-count', { room, count: ch.rooms.count(room) });
 
   socket.on('barrage', (payload) => {
     // 令牌桶限流：擋洗版，也保護伺服器頻寬
@@ -88,21 +161,21 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    rooms.leave(socket.data.room);
+    ch.rooms.leave(socket.data.room);
     io.to(socket.data.room).emit('room-count', {
       room: socket.data.room,
-      count: rooms.count(socket.data.room),
+      count: ch.rooms.count(socket.data.room),
     });
   });
 });
 
 server.listen(PORT, () => {
   console.log(`台股彈幕伺服器啟動 → http://localhost:${PORT}`);
-  console.log(`每房上限 ${ROOM_CAPACITY} 人；行情模式：${SIMULATE ? '模擬' : '證交所即時'}`);
+  console.log(`頻道：${Object.keys(channels).join('、')}；每房上限 ${ROOM_CAPACITY} 人；行情模式：${SIMULATE ? '模擬' : '即時'}`);
 });
 
 process.on('SIGINT', () => {
-  stopMarket();
+  stoppers.forEach((stop) => stop());
   io.close();
   server.close(() => process.exit(0));
 });
