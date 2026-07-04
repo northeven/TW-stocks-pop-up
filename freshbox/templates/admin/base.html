@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}後台管理{% endblock %}|{{ settings.shop_name }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="admin">
+<header class="admin-header">
+  <div class="wrap">
+    <a class="brand" href="{{ url_for('admin.dashboard') }}">⚙️ {{ settings.shop_name }} 後台</a>
+    <nav class="admin-nav">
+      <a href="{{ url_for('admin.dashboard') }}">總覽</a>
+      <a href="{{ url_for('admin.orders') }}">訂單</a>
+      <a href="{{ url_for('admin.products') }}">商品</a>
+      <a href="{{ url_for('admin.categories') }}">分類</a>
+      <a href="{{ url_for('admin.pickup_points') }}">取貨點</a>
+      <a href="{{ url_for('admin.import_csv') }}">匯入</a>
+      <a href="{{ url_for('admin.report') }}">報表</a>
+      <a href="{{ url_for('admin.settings_page') }}">設定</a>
+      <a href="{{ url_for('index') }}" target="_blank">看前台 ↗</a>
+      <form method="post" action="{{ url_for('admin.logout') }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn-link" type="submit">登出</button>
+      </form>
+    </nav>
+  </div>
+</header>
+{% if session.get('must_change_pw') %}
+<div class="wrap"><div class="warn-box">⚠️ 您還在使用預設密碼,為了帳號安全請立即 <a href="{{ url_for('admin.change_password') }}">修改密碼</a>。</div></div>
+{% endif %}
+{% with messages = get_flashed_messages() %}
+  {% if messages %}<div class="wrap">{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

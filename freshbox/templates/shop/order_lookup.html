@@ -1,0 +1,43 @@
+{% extends "shop/base.html" %}
+{% block title %}訂單查詢|{{ settings.shop_name }}{% endblock %}
+{% block content %}
+<h1>訂單查詢</h1>
+<form method="get" class="lookup-form">
+  <label>訂單編號<input type="text" name="order_no" value="{{ order_no }}" placeholder="FB260704001" required></label>
+  <label>手機號碼<input type="tel" name="phone" value="{{ phone }}" placeholder="0912345678" required></label>
+  <button class="btn btn-primary" type="submit">查詢</button>
+</form>
+
+{% if order %}
+<div class="order-box">
+  <h2>訂單 {{ order.order_no }}</h2>
+  <div class="status-line">
+    <span class="pill status-{{ order.order_status }}">{{ ORDER_STATUS[order.order_status] }}</span>
+    <span class="pill pay-{{ order.payment_status }}">{{ PAYMENT_STATUS[order.payment_status] }}</span>
+  </div>
+  <ul class="summary-list">
+    {% for it in items %}<li>{{ it.product_name }} × {{ it.qty }} <span>NT${{ it.subtotal }}</span></li>{% endfor %}
+  </ul>
+  <div class="cart-total">合計:<strong>NT${{ order.total_amount }}</strong></div>
+  <p>取貨點:{{ order.pickup_point_name }}|下單時間:{{ order.created_at }}</p>
+  {% if order.order_status == 'ready' %}
+  <div class="warn-box">📦 商品已到貨!請於 {{ settings.pickup_deadline_days }} 天內至「{{ order.pickup_point_name }}」取貨。</div>
+  {% endif %}
+
+  {% if order.payment_method == 'transfer' and order.payment_status in ('unpaid', 'pending_check') %}
+  <div class="pay-box">
+    <h3>轉帳資訊</h3>
+    <pre class="bank-info">{{ settings.bank_info }}</pre>
+    {% if order.transfer_last5 %}<p>已回報末五碼:{{ order.transfer_last5 }}(核對中)</p>{% endif %}
+    <form method="post" action="{{ url_for('report_transfer') }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="order_no" value="{{ order.order_no }}">
+      <input type="hidden" name="phone" value="{{ order.phone }}">
+      <input type="text" name="last5" placeholder="帳號末五碼" pattern="[0-9]{5}" required>
+      <button class="btn" type="submit">{% if order.transfer_last5 %}更新回報{% else %}回報轉帳{% endif %}</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

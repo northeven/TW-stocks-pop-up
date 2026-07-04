@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% block title %}分類管理{% endblock %}
+{% block content %}
+<h1>分類管理</h1>
+<form method="post" class="filter-bar">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="action" value="add">
+  <input type="text" name="name" placeholder="新分類名稱" required>
+  <button class="btn btn-primary" type="submit">+ 新增分類</button>
+</form>
+<table class="data-table">
+  <thead><tr><th>名稱</th><th>排序</th><th>商品數</th><th>顯示</th><th></th></tr></thead>
+  <tbody>
+  {% for c in categories %}
+  <tr>
+    <td><input form="cat-{{ c.id }}" type="text" name="name" value="{{ c.name }}"></td>
+    <td><input form="cat-{{ c.id }}" type="number" name="sort_order" value="{{ c.sort_order }}" class="w-sm"></td>
+    <td><a href="{{ url_for('admin.products', category=c.id) }}">{{ c.cnt }}</a></td>
+    <td><input form="cat-{{ c.id }}" type="checkbox" name="is_active" {% if c.is_active %}checked{% endif %}></td>
+    <td class="actions">
+      <button form="cat-{{ c.id }}" class="btn btn-sm" name="action" value="update" type="submit">儲存</button>
+      <button form="cat-{{ c.id }}" class="btn btn-sm btn-danger" name="action" value="delete" type="submit"
+              onclick="return confirm('確定刪除「{{ c.name }}」?');">刪除</button>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% for c in categories %}
+<form id="cat-{{ c.id }}" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="id" value="{{ c.id }}">
+</form>
+{% endfor %}
+{% endblock %}

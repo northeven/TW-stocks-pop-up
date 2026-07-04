@@ -1,0 +1,48 @@
+{% extends "shop/base.html" %}
+{% block title %}結帳|{{ settings.shop_name }}{% endblock %}
+{% block content %}
+<h1>結帳</h1>
+<div class="checkout-grid">
+  <div class="checkout-summary">
+    <h2>訂單內容</h2>
+    <ul class="summary-list">
+      {% for it in items %}<li>{{ it.product.name }} × {{ it.qty }} <span>NT${{ it.subtotal }}</span></li>{% endfor %}
+    </ul>
+    <div class="cart-total">合計:<strong>NT${{ total }}</strong></div>
+    <p class="hint">預購制:下單後 {{ settings.preorder_days }} 個工作天送達取貨點</p>
+  </div>
+
+  <form method="post" class="checkout-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h2>取貨資訊</h2>
+    <label>姓名 *<input type="text" name="customer_name" value="{{ request.form.customer_name or '' }}" required></label>
+    <label>手機號碼 *<input type="tel" name="phone" value="{{ request.form.phone or '' }}" placeholder="0912345678" pattern="09[0-9]{8}" required></label>
+    <label>取貨點 *
+      <select name="pickup_point_id" required>
+        <option value="">請選擇</option>
+        {% for pp in pickup_points %}
+        <option value="{{ pp.id }}" {% if request.form.pickup_point_id == pp.id|string %}selected{% endif %}>{{ pp.name }}{% if pp.address %}({{ pp.address }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>備註<textarea name="note" rows="2" placeholder="其他需求(選填)">{{ request.form.note or '' }}</textarea></label>
+
+    <h2>付款方式</h2>
+    <div class="pay-options">
+      {% if 'transfer' in methods %}
+      <label class="pay-option"><input type="radio" name="payment_method" value="transfer" {% if request.form.payment_method == 'transfer' or not request.form.payment_method %}checked{% endif %}>
+        <span><strong>轉帳匯款</strong><br><small>下單後依付款指示轉帳,並回報帳號末五碼</small></span></label>
+      {% endif %}
+      {% if 'cod' in methods %}
+      <label class="pay-option"><input type="radio" name="payment_method" value="cod" {% if request.form.payment_method == 'cod' %}checked{% endif %}>
+        <span><strong>取貨付款</strong><br><small>取貨時現場付款</small></span></label>
+      {% endif %}
+      {% if 'ecpay' in methods %}
+      <label class="pay-option"><input type="radio" name="payment_method" value="ecpay" {% if request.form.payment_method == 'ecpay' %}checked{% endif %}>
+        <span><strong>線上付款</strong><br><small>信用卡/ATM/超商代碼(綠界金流)</small></span></label>
+      {% endif %}
+    </div>
+    <button class="btn btn-primary btn-lg btn-block" type="submit">送出訂單(NT${{ total }})</button>
+  </form>
+</div>
+{% endblock %}

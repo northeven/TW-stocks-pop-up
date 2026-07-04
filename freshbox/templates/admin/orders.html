@@ -1,0 +1,60 @@
+{% extends "admin/base.html" %}
+{% block title %}訂單管理{% endblock %}
+{% block content %}
+<h1>訂單管理</h1>
+
+<div class="status-tabs">
+  <a href="{{ url_for('admin.orders') }}" class="{% if not status %}active{% endif %}">全部</a>
+  {% for key, label in ORDER_STATUS.items() %}
+  <a href="{{ url_for('admin.orders', status=key) }}" class="{% if status == key %}active{% endif %}">{{ label }}{% if counts.get(key) %} ({{ counts[key] }}){% endif %}</a>
+  {% endfor %}
+</div>
+
+<form method="get" class="filter-bar">
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="text" name="q" value="{{ q }}" placeholder="訂單編號/姓名/電話">
+  <select name="pickup">
+    <option value="">全部取貨點</option>
+    {% for pp in points %}<option value="{{ pp.id }}" {% if pickup == pp.id|string %}selected{% endif %}>{{ pp.name }}</option>{% endfor %}
+  </select>
+  <select name="pay">
+    <option value="">全部付款狀態</option>
+    {% for key, label in PAYMENT_STATUS.items() %}<option value="{{ key }}" {% if pay == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <input type="date" name="from" value="{{ date_from }}">
+  <input type="date" name="to" value="{{ date_to }}">
+  <button class="btn" type="submit">篩選</button>
+</form>
+
+<form method="post" action="{{ url_for('admin.orders_bulk') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<div class="bulk-bar">
+  勾選訂單批次變更為
+  <select name="new_status">
+    {% for key, label in ORDER_STATUS.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+  </select>
+  <button class="btn" type="submit" onclick="return confirm('確定批次變更勾選的訂單狀態?');">套用</button>
+  <small>(變更為「待取貨」會自動發 LINE 到貨通知給已綁定的客人)</small>
+</div>
+<table class="data-table">
+  <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('input[name=order_ids]').forEach(c=>c.checked=this.checked)"></th>
+    <th>訂單</th><th>客戶</th><th>取貨點</th><th>金額</th><th>付款</th><th>狀態</th></tr></thead>
+  <tbody>
+  {% for o in orders %}
+  <tr>
+    <td><input type="checkbox" name="order_ids" value="{{ o.id }}"></td>
+    <td><a href="{{ url_for('admin.order_detail', oid=o.id) }}">{{ o.order_no }}</a><br><small>{{ o.created_at[:16] }}</small></td>
+    <td>{{ o.customer_name }}<br><small>{{ o.phone }}</small></td>
+    <td>{{ o.pickup_point_name }}</td>
+    <td>NT${{ o.total_amount }}</td>
+    <td><span class="pill pay-{{ o.payment_status }}">{{ PAYMENT_STATUS[o.payment_status] }}</span>
+        <br><small>{{ PAYMENT_METHOD.get(o.payment_method, o.payment_method) }}{% if o.transfer_last5 %} 末五碼 {{ o.transfer_last5 }}{% endif %}</small></td>
+    <td><span class="pill status-{{ o.order_status }}">{{ ORDER_STATUS[o.order_status] }}</span>
+        {% if o.line_user_id %}<br><small>📲 已綁LINE</small>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="empty">沒有符合的訂單</td></tr>{% endfor %}
+  </tbody>
+</table>
+</form>
+<p><small>共 {{ orders|length }} 筆(最多顯示 500 筆,更多請用報表匯出)</small></p>
+{% endblock %}

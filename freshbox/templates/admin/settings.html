@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+{% block title %}系統設定{% endblock %}
+{% block content %}
+<h1>系統設定</h1>
+<form method="post" class="edit-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="form-grid">
+    {% for key, label in fields %}
+      {% if key in ('bank_info', 'shop_intro', 'announcement') %}
+        <label class="span2">{{ label }}<textarea name="{{ key }}" rows="3">{{ settings.get(key, '') }}</textarea></label>
+      {% else %}
+        <label>{{ label }}<input type="text" name="{{ key }}" value="{{ settings.get(key, '') }}"></label>
+      {% endif %}
+    {% endfor %}
+    <label class="check"><input type="checkbox" name="enable_transfer" {% if settings.get('enable_transfer') == '1' %}checked{% endif %}> 開放「轉帳匯款」付款</label>
+    <label class="check"><input type="checkbox" name="enable_cod" {% if settings.get('enable_cod') == '1' %}checked{% endif %}> 開放「取貨付款」</label>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary btn-lg" type="submit">儲存設定</button></div>
+</form>
+
+<h2>整合狀態</h2>
+<table class="data-table">
+  <tbody>
+    <tr><td>綠界 ECPay 線上金流</td>
+        <td>{% if ecpay_enabled %}<span class="pill on">已啟用</span>{% else %}<span class="pill off">未設定</span> 設定環境變數 ECPAY_MERCHANT_ID / ECPAY_HASH_KEY / ECPAY_HASH_IV 即自動啟用{% endif %}</td></tr>
+    <tr><td>LINE 官方帳號通知</td>
+        <td>{% if line_enabled %}<span class="pill on">已啟用</span> Webhook 網址:<code>/webhook/line</code>{% else %}<span class="pill off">未設定</span> 設定環境變數 LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET 即自動啟用{% endif %}</td></tr>
+  </tbody>
+</table>
+<p><a class="btn" href="{{ url_for('admin.change_password') }}">修改後台密碼</a></p>
+{% endblock %}

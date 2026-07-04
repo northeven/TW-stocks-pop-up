@@ -1,0 +1,39 @@
+{% extends "shop/base.html" %}
+{% block title %}購物車|{{ settings.shop_name }}{% endblock %}
+{% block content %}
+<h1>購物車</h1>
+{% if items %}
+<form method="post" action="{{ url_for('cart_update') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<table class="cart-table">
+  <thead><tr><th>商品</th><th>單價</th><th>數量</th><th>小計</th><th></th></tr></thead>
+  <tbody>
+  {% for it in items %}
+    <tr>
+      <td data-th="商品">{{ it.product.name }}{% if it.product.spec %}<br><small>{{ it.product.spec }}</small>{% endif %}</td>
+      <td data-th="單價">NT${{ it.product.price }}</td>
+      <td data-th="數量"><input type="number" name="qty_{{ it.product.id }}" value="{{ it.qty }}" min="0"
+        {% if it.product.stock_qty is not none %}max="{{ it.product.stock_qty }}"{% endif %}></td>
+      <td data-th="小計">NT${{ it.subtotal }}</td>
+      <td><button class="btn btn-sm btn-danger" name="remove" value="{{ it.product.id }}">移除</button></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="cart-actions">
+  <button class="btn" type="submit">更新數量</button>
+  <div class="cart-total">合計:<strong>NT${{ total }}</strong></div>
+</div>
+</form>
+{% if shortage > 0 %}
+  <div class="warn-box">還差 NT${{ shortage }} 才達最低訂購金額 NT${{ min_amount }},<a href="{{ url_for('index') }}">再去逛逛 →</a></div>
+{% else %}
+  <div class="checkout-bar">
+    <a class="btn" href="{{ url_for('index') }}">← 繼續選購</a>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('checkout') }}">前往結帳 →</a>
+  </div>
+{% endif %}
+{% else %}
+<p class="empty">購物車是空的,<a href="{{ url_for('index') }}">去逛逛 →</a></p>
+{% endif %}
+{% endblock %}

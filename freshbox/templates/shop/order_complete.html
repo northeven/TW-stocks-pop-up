@@ -1,0 +1,52 @@
+{% extends "shop/base.html" %}
+{% block title %}訂單完成|{{ settings.shop_name }}{% endblock %}
+{% block content %}
+<div class="order-complete">
+  <h1>🎉 訂單已成立!</h1>
+  <p class="order-no">訂單編號:<strong>{{ order.order_no }}</strong></p>
+  <p>請記下訂單編號,可隨時到「<a href="{{ url_for('order_lookup', order_no=order.order_no, phone=order.phone) }}">查訂單</a>」查看進度。</p>
+
+  <div class="order-box">
+    <h2>訂單內容</h2>
+    <ul class="summary-list">
+      {% for it in items %}<li>{{ it.product_name }} × {{ it.qty }} <span>NT${{ it.subtotal }}</span></li>{% endfor %}
+    </ul>
+    <div class="cart-total">合計:<strong>NT${{ order.total_amount }}</strong></div>
+    <p>取貨點:{{ order.pickup_point_name }}|預計 {{ settings.preorder_days }} 個工作天到貨</p>
+  </div>
+
+  {% if order.payment_method == 'transfer' %}
+  <div class="pay-box">
+    <h2>💳 付款指示(轉帳匯款)</h2>
+    <pre class="bank-info">{{ settings.bank_info }}</pre>
+    <p>金額:<strong>NT${{ order.total_amount }}</strong></p>
+    <p>轉帳完成後,請回報帳號末五碼,加速核帳出貨:</p>
+    <form method="post" action="{{ url_for('report_transfer') }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="order_no" value="{{ order.order_no }}">
+      <input type="hidden" name="phone" value="{{ order.phone }}">
+      <input type="text" name="last5" placeholder="帳號末五碼" pattern="[0-9]{5}" required>
+      <button class="btn btn-primary" type="submit">回報轉帳</button>
+    </form>
+  </div>
+  {% elif order.payment_method == 'cod' %}
+  <div class="pay-box"><h2>💰 取貨付款</h2><p>到貨通知後,請於取貨時以現金付款 NT${{ order.total_amount }}。</p></div>
+  {% elif order.payment_method == 'ecpay' %}
+  <div class="pay-box">
+    <h2>💳 線上付款</h2>
+    {% if order.payment_status == 'paid' %}<p>✅ 已完成付款,我們會盡快為您備貨!</p>
+    {% else %}<p>尚未完成付款?<a class="btn btn-primary" href="{{ url_for('pay_ecpay', order_no=order.order_no) }}">前往付款 →</a></p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if settings.line_url %}
+  <div class="line-box">
+    <h2>📲 加 LINE 接收到貨通知</h2>
+    <p>1. <a href="{{ settings.line_url }}" target="_blank" rel="noopener">點此加入官方 LINE</a><br>
+    2. 傳訊息:「查詢 {{ order.order_no }} {{ order.phone[-3:] }}」<br>
+    3. 到貨時就會自動 LINE 通知您!</p>
+  </div>
+  {% endif %}
+  <p><a href="{{ url_for('index') }}">← 回商店首頁</a></p>
+</div>
+{% endblock %}

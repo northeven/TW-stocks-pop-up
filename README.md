@@ -91,3 +91,11 @@ public/
 - 台積電 ADR：Yahoo Finance 公開 chart API
 
 均僅供個人趣味用途；請保持合理的輪詢頻率。
+
+---
+
+## 📦 Vitaslow Freshbox 團購結帳系統
+
+本 repo 的 `freshbox/` 目錄是另一個獨立專案:EatAsia 辦公室團購生鮮品牌的完整訂購系統
+(商品管理、購物車結帳、訂單狀態機、綠界金流、LINE 官方帳號通知與訂單查詢機器人)。
+安裝與部署說明見 [freshbox/README.md](freshbox/README.md)。

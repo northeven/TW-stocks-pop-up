@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% block title %}對帳報表{% endblock %}
+{% block content %}
+<h1>對帳報表</h1>
+<form method="get" class="filter-bar">
+  <input type="date" name="from" value="{{ date_from }}">
+  <input type="date" name="to" value="{{ date_to }}">
+  <button class="btn" type="submit">查詢</button>
+  <a class="btn btn-primary" href="{{ url_for('admin.report_csv', **{'from': date_from, 'to': date_to}) }}">⬇ 匯出 CSV</a>
+</form>
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="num">{{ summary.count }}</div><div class="label">有效訂單數</div></div>
+  <div class="stat-card"><div class="num">NT${{ '{:,}'.format(summary.total) }}</div><div class="label">訂單總額</div></div>
+  <div class="stat-card"><div class="num">NT${{ '{:,}'.format(summary.paid) }}</div><div class="label">已收款</div></div>
+  <div class="stat-card {% if summary.unpaid %}hot{% endif %}"><div class="num">NT${{ '{:,}'.format(summary.unpaid) }}</div><div class="label">未收款</div></div>
+</div>
+
+<div class="two-col">
+  <section>
+    <h2>依取貨點</h2>
+    <table class="data-table">
+      <thead><tr><th>取貨點</th><th>訂單數</th><th>金額</th></tr></thead>
+      <tbody>{% for name, v in by_pickup.items() %}<tr><td>{{ name }}</td><td>{{ v[0] }}</td><td>NT${{ '{:,}'.format(v[1]) }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+  <section>
+    <h2>依付款方式</h2>
+    <table class="data-table">
+      <thead><tr><th>付款方式</th><th>訂單數</th><th>金額</th></tr></thead>
+      <tbody>{% for name, v in by_method.items() %}<tr><td>{{ name }}</td><td>{{ v[0] }}</td><td>NT${{ '{:,}'.format(v[1]) }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+</div>
+
+<h2>訂單明細({{ rows|length }} 筆)</h2>
+<table class="data-table">
+  <thead><tr><th>訂單</th><th>客戶</th><th>取貨點</th><th>商品</th><th>金額</th><th>付款</th><th>狀態</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr class="{% if r.order_status == 'cancelled' %}muted{% endif %}">
+    <td><a href="{{ url_for('admin.order_detail', oid=r.id) }}">{{ r.order_no }}</a><br><small>{{ r.created_at[:16] }}</small></td>
+    <td>{{ r.customer_name }}</td>
+    <td>{{ r.pickup_point_name }}</td>
+    <td><small>{{ r.items_text }}</small></td>
+    <td>NT${{ r.total_amount }}</td>
+    <td><span class="pill pay-{{ r.payment_status }}">{{ PAYMENT_STATUS[r.payment_status] }}</span></td>
+    <td><span class="pill status-{{ r.order_status }}">{{ ORDER_STATUS[r.order_status] }}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

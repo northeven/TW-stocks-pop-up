@@ -1,0 +1,49 @@
+{% extends "admin/base.html" %}
+{% block title %}商品管理{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>商品管理</h1>
+  <a class="btn btn-primary" href="{{ url_for('admin.product_new') }}">+ 新增商品</a>
+</div>
+
+<form method="get" class="filter-bar">
+  <input type="text" name="q" value="{{ q }}" placeholder="搜尋名稱/標籤">
+  <select name="category">
+    <option value="">全部分類</option>
+    {% for c in categories %}<option value="{{ c.id }}" {% if cat == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select>
+  <select name="filter">
+    <option value="">全部商品</option>
+    <option value="no_price" {% if filt == 'no_price' %}selected{% endif %}>待補價格</option>
+    <option value="low_stock" {% if filt == 'low_stock' %}selected{% endif %}>庫存告急</option>
+    <option value="inactive" {% if filt == 'inactive' %}selected{% endif %}>已下架</option>
+  </select>
+  <button class="btn" type="submit">篩選</button>
+</form>
+
+<table class="data-table">
+  <thead><tr><th>圖</th><th>商品</th><th>分類</th><th>售價</th><th>庫存</th><th>已售</th><th>狀態</th><th></th></tr></thead>
+  <tbody>
+  {% for p in products %}
+  <tr class="{% if not p.is_active %}muted{% endif %}">
+    <td>{% if p.image_url %}<img class="thumb" src="{{ url_for('uploaded_file', filename=p.image_url) }}" alt="">{% else %}—{% endif %}</td>
+    <td><a href="{{ url_for('admin.product_edit', pid=p.id) }}">{{ p.name }}</a>
+        {% if p.tag %}<span class="tag">{{ p.tag }}</span>{% endif %}
+        {% if p.spec %}<br><small>{{ p.spec }}</small>{% endif %}</td>
+    <td>{{ p.category_name or '—' }}</td>
+    <td>{% if p.price <= 0 %}<span class="stock-warn">$0 待補</span>{% else %}NT${{ p.price }}{% endif %}</td>
+    <td>{% if p.stock_qty is none %}不限{% elif p.stock_qty <= 5 %}<span class="stock-warn">{{ p.stock_qty }}</span>{% else %}{{ p.stock_qty }}{% endif %}</td>
+    <td>{{ p.sold_qty }}</td>
+    <td>{% if p.is_active %}<span class="pill on">上架中</span>{% else %}<span class="pill off">已下架</span>{% endif %}</td>
+    <td class="actions">
+      <form method="post" action="{{ url_for('admin.product_toggle', pid=p.id) }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-sm" type="submit">{% if p.is_active %}下架{% else %}上架{% endif %}</button>
+      </form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="empty">沒有符合的商品</td></tr>{% endfor %}
+  </tbody>
+</table>
+<p><small>共 {{ products|length }} 筆</small></p>
+{% endblock %}

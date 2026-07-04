@@ -1,0 +1,38 @@
+{% extends "admin/base.html" %}
+{% block title %}取貨點管理{% endblock %}
+{% block content %}
+<h1>取貨點管理</h1>
+<form method="post" class="filter-bar">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="action" value="add">
+  <input type="text" name="name" placeholder="取貨點名稱" required>
+  <input type="text" name="address" placeholder="地址(選填)">
+  <input type="text" name="note" placeholder="備註(選填)">
+  <button class="btn btn-primary" type="submit">+ 新增取貨點</button>
+</form>
+<table class="data-table">
+  <thead><tr><th>名稱</th><th>地址</th><th>備註</th><th>排序</th><th>啟用</th><th></th></tr></thead>
+  <tbody>
+  {% for pp in points %}
+  <tr class="{% if not pp.is_active %}muted{% endif %}">
+    <td><input form="pp-{{ pp.id }}" type="text" name="name" value="{{ pp.name }}"></td>
+    <td><input form="pp-{{ pp.id }}" type="text" name="address" value="{{ pp.address }}"></td>
+    <td><input form="pp-{{ pp.id }}" type="text" name="note" value="{{ pp.note }}"></td>
+    <td><input form="pp-{{ pp.id }}" type="number" name="sort_order" value="{{ pp.sort_order }}" class="w-sm"></td>
+    <td><input form="pp-{{ pp.id }}" type="checkbox" name="is_active" {% if pp.is_active %}checked{% endif %}></td>
+    <td class="actions">
+      <button form="pp-{{ pp.id }}" class="btn btn-sm" name="action" value="update" type="submit">儲存</button>
+      <button form="pp-{{ pp.id }}" class="btn btn-sm btn-danger" name="action" value="delete" type="submit"
+              onclick="return confirm('確定刪除「{{ pp.name }}」?');">刪除</button>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% for pp in points %}
+<form id="pp-{{ pp.id }}" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="id" value="{{ pp.id }}">
+</form>
+{% endfor %}
+{% endblock %}

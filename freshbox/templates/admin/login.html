@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>後台登入</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="admin login-page">
+<div class="login-card">
+  <h1>{{ settings.shop_name }}<br><small>後台管理</small></h1>
+  {% with messages = get_flashed_messages() %}
+    {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>帳號<input type="text" name="username" autocomplete="username" required autofocus></label>
+    <label>密碼<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn btn-primary btn-block" type="submit">登入</button>
+  </form>
+</div>
+</body>
+</html>

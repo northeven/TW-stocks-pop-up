@@ -1,0 +1,32 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ p.name }}|{{ settings.shop_name }}{% endblock %}
+{% block content %}
+<div class="product-detail">
+  <div class="product-detail-img">
+    {% if p.image_url %}<img src="{{ url_for('uploaded_file', filename=p.image_url) }}" alt="{{ p.name }}">
+    {% else %}<div class="img-placeholder big">🥐</div>{% endif %}
+    {% if images %}
+    <div class="gallery">
+      {% for img in images %}<img src="{{ url_for('uploaded_file', filename=img.filename) }}" alt="">{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="product-detail-info">
+    <h1>{{ p.name }}{% if p.tag %} <span class="tag">{{ p.tag }}</span>{% endif %}</h1>
+    {% if p.spec %}<p class="product-spec">{{ p.spec }}</p>{% endif %}
+    <div class="product-price big">
+      <span class="price">NT${{ p.price }}</span>
+      {% if p.original_price and p.original_price > p.price %}<del>NT${{ p.original_price }}</del>{% endif %}
+    </div>
+    {% if p.stock_qty is not none %}<p class="stock-info">庫存:{{ p.stock_qty }} 件</p>{% endif %}
+    {% if p.description %}<div class="product-desc">{{ p.description | replace('\n', '<br>') | safe }}</div>{% endif %}
+    <form method="post" action="{{ url_for('cart_add') }}" class="add-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="product_id" value="{{ p.id }}">
+      <label>數量 <input type="number" name="qty" value="1" min="1" {% if p.stock_qty is not none %}max="{{ p.stock_qty }}"{% endif %}></label>
+      <button class="btn btn-primary" type="submit">加入購物車</button>
+    </form>
+    <p><a href="{{ url_for('index') }}">← 繼續選購</a></p>
+  </div>
+</div>
+{% endblock %}

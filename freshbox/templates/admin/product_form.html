@@ -1,0 +1,77 @@
+{% extends "admin/base.html" %}
+{% block title %}{% if p %}編輯商品{% else %}新增商品{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{% if p %}編輯商品{% else %}新增商品{% endif %}</h1>
+  <a class="btn" href="{{ url_for('admin.products') }}">← 回商品列表</a>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="edit-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="form-grid">
+    <label class="span2">商品名稱 *<input type="text" name="name" value="{{ p.name if p else '' }}" required></label>
+    <label>分類
+      <select name="category_id">
+        <option value="">未分類</option>
+        {% for c in categories %}<option value="{{ c.id }}" {% if p and p.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>規格<input type="text" name="spec" value="{{ p.spec if p else '' }}" placeholder="例:1 條(約450g)"></label>
+    <label>售價(NT$)*<input type="number" name="price" value="{{ p.price if p else '' }}" min="0" required></label>
+    <label>原價(劃線價,選填)<input type="number" name="original_price" value="{{ p.original_price if p and p.original_price else '' }}" min="0"></label>
+    <label>庫存(留空 = 不限量)<input type="number" name="stock_qty" value="{{ p.stock_qty if p and p.stock_qty is not none else '' }}"></label>
+    <label>標籤(人氣/限量/禮盒…)<input type="text" name="tag" value="{{ p.tag if p else '' }}"></label>
+    <label>開賣日(選填)<input type="date" name="sell_start" value="{{ p.sell_start if p else '' }}"></label>
+    <label>截單日(選填)<input type="date" name="sell_end" value="{{ p.sell_end if p else '' }}"></label>
+    <label>排序(小的在前)<input type="number" name="sort_order" value="{{ p.sort_order if p else 0 }}"></label>
+    <label class="span2">商品說明<textarea name="description" rows="4">{{ p.description if p else '' }}</textarea></label>
+    <label class="check"><input type="checkbox" name="is_limited" {% if p and p.is_limited %}checked{% endif %}> 限量商品</label>
+    <label class="check"><input type="checkbox" name="is_active" {% if not p or p.is_active %}checked{% endif %}> 上架販售</label>
+  </div>
+
+  <h2>商品圖片</h2>
+  {% if p and p.image_url %}
+  <div class="img-row">
+    <figure><img class="thumb-lg" src="{{ url_for('uploaded_file', filename=p.image_url) }}" alt=""><figcaption>封面圖</figcaption></figure>
+  </div>
+  {% endif %}
+  {% if images %}
+  <div class="img-row">
+    {% for img in images %}
+    <figure>
+      <img class="thumb-lg" src="{{ url_for('uploaded_file', filename=img.filename) }}" alt="">
+      <figcaption>相簿 #{{ loop.index }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <label>上傳圖片(可一次選多張;沒有封面時第一張自動裁切為封面)
+    <input type="file" name="images" accept=".jpg,.jpeg,.png,.webp,.gif" multiple></label>
+
+  <div class="form-actions">
+    <button class="btn btn-primary btn-lg" type="submit">儲存</button>
+  </div>
+</form>
+
+{% if p %}
+<div class="danger-zone">
+  {% if p.image_url %}
+  <form method="post" action="{{ url_for('admin.product_cover_clear', pid=p.id) }}" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn btn-sm" type="submit">移除封面圖</button>
+  </form>
+  {% endif %}
+  {% for img in images %}
+  <form method="post" action="{{ url_for('admin.product_image_delete', pid=p.id, img_id=img.id) }}" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn btn-sm" type="submit">刪相簿 #{{ loop.index }}</button>
+  </form>
+  {% endfor %}
+  <form method="post" action="{{ url_for('admin.product_delete', pid=p.id) }}" class="inline"
+        onsubmit="return confirm('確定要刪除這個商品?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn btn-sm btn-danger" type="submit">刪除商品</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

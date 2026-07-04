@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ settings.shop_name }}{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="shop">
+<header class="shop-header">
+  <div class="wrap">
+    <a class="brand" href="{{ url_for('index') }}">{{ settings.shop_name }}</a>
+    <nav class="shop-nav">
+      <a href="{{ url_for('order_lookup') }}">查訂單</a>
+      {% if settings.line_url %}<a href="{{ settings.line_url }}" target="_blank" rel="noopener" class="line-link">加LINE</a>{% endif %}
+      <a href="{{ url_for('cart_view') }}" class="cart-link">🛒 購物車{% if cart_count %}<span class="badge">{{ cart_count }}</span>{% endif %}</a>
+    </nav>
+  </div>
+</header>
+{% if settings.announcement %}<div class="announcement wrap">📢 {{ settings.announcement }}</div>{% endif %}
+{% with messages = get_flashed_messages() %}
+  {% if messages %}<div class="wrap">{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+<footer class="shop-footer">
+  <div class="wrap">
+    <p>{{ settings.shop_intro }}</p>
+    <p>預購制:下單後 {{ settings.preorder_days }} 個工作天送達取貨點,到貨後請於 {{ settings.pickup_deadline_days }} 天內取貨。最低訂購金額 NT${{ settings.min_order_amount }}。</p>
+  </div>
+</footer>
+</body>
+</html>

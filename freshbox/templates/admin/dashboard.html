@@ -1,0 +1,59 @@
+{% extends "admin/base.html" %}
+{% block title %}總覽{% endblock %}
+{% block content %}
+<h1>營運總覽</h1>
+<div class="stat-grid">
+  <a class="stat-card" href="{{ url_for('admin.orders') }}"><div class="num">{{ stats.today_orders }}</div><div class="label">今日訂單</div></a>
+  <a class="stat-card {% if stats.pending %}hot{% endif %}" href="{{ url_for('admin.orders', status='pending') }}"><div class="num">{{ stats.pending }}</div><div class="label">待確認</div></a>
+  <a class="stat-card {% if stats.pending_check %}hot{% endif %}" href="{{ url_for('admin.orders', pay='pending_check') }}"><div class="num">{{ stats.pending_check }}</div><div class="label">待核帳</div></a>
+  <a class="stat-card" href="{{ url_for('admin.orders', status='ready') }}"><div class="num">{{ stats.ready }}</div><div class="label">待取貨</div></a>
+  <div class="stat-card"><div class="num">NT${{ '{:,}'.format(stats.month_revenue) }}</div><div class="label">本月訂單金額</div></div>
+  <div class="stat-card"><div class="num">NT${{ '{:,}'.format(stats.month_paid) }}</div><div class="label">本月已收款</div></div>
+</div>
+
+{% if no_price %}
+<div class="warn-box">⚠️ 還有 {{ no_price }} 個上架商品價格為 0(待補價格),<a href="{{ url_for('admin.products', filter='no_price') }}">前往補齊 →</a></div>
+{% endif %}
+
+<div class="two-col">
+  <section>
+    <h2>最新訂單</h2>
+    <table class="data-table">
+      <thead><tr><th>訂單</th><th>客戶</th><th>金額</th><th>狀態</th></tr></thead>
+      <tbody>
+      {% for o in recent %}
+      <tr>
+        <td><a href="{{ url_for('admin.order_detail', oid=o.id) }}">{{ o.order_no }}</a><br><small>{{ o.created_at[5:16] }}</small></td>
+        <td>{{ o.customer_name }}<br><small>{{ o.pickup_point_name }}</small></td>
+        <td>NT${{ o.total_amount }}</td>
+        <td><span class="pill status-{{ o.order_status }}">{{ ORDER_STATUS[o.order_status] }}</span><br>
+            <span class="pill pay-{{ o.payment_status }}">{{ PAYMENT_STATUS[o.payment_status] }}</span></td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="empty">還沒有訂單</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>本月熱銷 TOP 5</h2>
+    <table class="data-table">
+      <thead><tr><th>商品</th><th>件數</th><th>金額</th></tr></thead>
+      <tbody>
+      {% for t in top_products %}
+      <tr><td>{{ t.product_name }}</td><td>{{ t.total_qty }}</td><td>NT${{ t.total_amt }}</td></tr>
+      {% else %}<tr><td colspan="3" class="empty">本月尚無銷售</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% if low_stock %}
+    <h2>庫存告急(≤5 件)</h2>
+    <table class="data-table">
+      <tbody>
+      {% for p in low_stock %}
+      <tr><td><a href="{{ url_for('admin.product_edit', pid=p.id) }}">{{ p.name }}</a></td>
+          <td class="stock-warn">剩 {{ p.stock_qty }} 件</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

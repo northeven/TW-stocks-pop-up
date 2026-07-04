@@ -10,3 +10,22 @@ services:
     envVars:
       - key: ROOM_CAPACITY
         value: "100"
+
+  # Vitaslow Freshbox 團購結帳系統(freshbox/ 目錄)
+  # 注意:SQLite 資料需要持久磁碟才不會在重新部署時消失。
+  # 建議在 Render dashboard 為此服務加一顆 Disk 掛載到 /var/data
+  #(Blueprint 的 disk 設定需要付費方案;免費方案僅適合測試展示)。
+  - type: web
+    name: vitaslow-freshbox
+    runtime: python
+    plan: free
+    rootDir: freshbox
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data
+      - key: PYTHON_VERSION
+        value: "3.11.9"

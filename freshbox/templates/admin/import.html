@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+{% block title %}CSV 匯入{% endblock %}
+{% block content %}
+<h1>商品批次匯入(CSV)</h1>
+<ol class="steps">
+  <li>下載 <a href="{{ url_for('admin.import_template') }}">CSV 範本</a>(可用 Excel 開啟編輯)</li>
+  <li>依範本填入商品資料。欄位:{% for h in headers %}<code>{{ h }}</code>{% endfor %}</li>
+  <li>「售價」未定的商品可先填 0,系統會自動加上「待補價格」標籤方便之後篩選</li>
+  <li>「分類」不存在時會自動建立;「上架」填 0 或「否」代表匯入後先不上架</li>
+</ol>
+<form method="post" enctype="multipart/form-data" class="filter-bar">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="file" name="file" accept=".csv" required>
+  <button class="btn btn-primary" type="submit">開始匯入</button>
+</form>
+
+{% if result %}
+<div class="order-box">
+  <h2>匯入結果</h2>
+  <p>✅ 成功匯入 {{ result.ok }} 筆{% if result.skipped %},略過 {{ result.skipped }} 筆{% endif %}</p>
+  {% if result.errors %}
+  <ul>{% for e in result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  {% endif %}
+  <p><a class="btn" href="{{ url_for('admin.products') }}">前往商品列表 →</a></p>
+</div>
+{% endif %}
+{% endblock %}

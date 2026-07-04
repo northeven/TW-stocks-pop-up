@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>前往付款…</title></head>
+<body onload="document.forms[0].submit()">
+<p style="font-family:sans-serif;text-align:center;margin-top:3em">正在為您導向綠界安全付款頁面…</p>
+<form method="post" action="{{ gateway_url }}">
+  {% for k, v in params.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <noscript><button type="submit">前往付款</button></noscript>
+</form>
+</body>
+</html>
