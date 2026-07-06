@@ -14,6 +14,7 @@
 - **匿名彈幕**：完全匿名，訊息飛過去就沒了，不落地、不存資料庫
 - **自動分房**：每頻道獨立分房，每房上限 500 人（可調），滿了自動開新房；彈幕只在房內廣播，控制伺服器頻寬成本
 - **防洗版**：同 IP 節流（每 0.6 秒才能再發，前端按鈕同步冷卻、後端依 IP 把關，擋多分頁繞過）＋ 令牌桶限流（可連發 3 則，之後每 2 秒補一則額度），單則最長 50 字
+- **防廣告**：後端內容過濾（正規化破解拆字／全形規避 → 網址、加賴、微信、Telegram、電話、詐騙話術靜默丟棄），命中不回饋發送者；擋下量在 `/stats` 觀測。策略與後續分層見 [`docs/moderation.md`](docs/moderation.md)
 - **模擬行情**：收盤時間或連不到行情來源時自動切換隨機漫步假行情，開發不用等開盤
 
 ## 快速開始
@@ -57,14 +58,14 @@ public/
 
 ## 監控
 
-`GET /stats` 回傳各頻道目前房間數、在線人數與行情來源：
+`GET /stats` 回傳各頻道目前房間數、在線人數、行情來源與被過濾擋下的彈幕數：
 
 ```json
 {
   "capacity": 500,
   "channels": {
-    "taiex": { "rooms": 2, "users": 137, "marketSource": "twse" },
-    "tsm": { "rooms": 1, "users": 42, "marketSource": "yahoo" }
+    "taiex": { "rooms": 2, "users": 137, "marketSource": "twse", "blocked": 23 },
+    "tsm": { "rooms": 1, "users": 42, "marketSource": "yahoo", "blocked": 4 }
   }
 }
 ```

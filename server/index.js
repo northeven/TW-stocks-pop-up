@@ -5,6 +5,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { RoomManager } from './rooms.js';
 import { startMarketFeed, fetchTaiex, fetchYahoo } from './market.js';
+import { screen } from './filter.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 500;
@@ -58,6 +59,7 @@ for (const [key, cfg] of Object.entries(CHANNEL_CONFIG)) {
     prevClose: null,
     lastCumVolume: null, // 上一筆累積成交量，用來換算單筆量
     latest: null,
+    blocked: 0, // 被內容過濾擋下的彈幕數（觀測用）
   };
 }
 
@@ -112,6 +114,7 @@ app.get('/stats', (_req, res) => {
       rooms: ch.rooms.totalRooms(),
       users: ch.rooms.totalUsers(),
       marketSource: ch.latest?.source ?? null,
+      blocked: ch.blocked,
     };
   }
   res.json({ capacity: ROOM_CAPACITY, channels: perChannel });
@@ -215,8 +218,17 @@ io.on('connection', (socket) => {
     const text = sanitizeText(payload?.text);
     if (!text) return;
 
+    // 先消耗限流額度再過濾：洗版廣告即使被擋，一樣受 0.6s／令牌桶限速
     socket.data.tokens -= 1;
     ipLastSent.set(ip, now);
+
+    // 內容過濾（廣告／聯絡方式）：靜默丟棄，不回饋發送者。
+    // 發送者端已本地顯示自己的彈幕，等同影子封鎖——別人看不到，他也不知道被擋。
+    if (!screen(text).ok) {
+      ch.blocked += 1;
+      return;
+    }
+
     // 完全匿名：不帶任何身分識別。發送者已在本地顯示，只廣播給房間其他人
     socket.to(socket.data.room).emit('barrage', { text });
   });
