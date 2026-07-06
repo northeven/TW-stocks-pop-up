@@ -7,13 +7,29 @@ import { RoomManager } from './rooms.js';
 import { startMarketFeed, fetchTaiex, fetchYahoo } from './market.js';
 
 const PORT = Number(process.env.PORT) || 3000;
-const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 100;
+const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 200;
 const SIMULATE = process.env.SIMULATE === '1';
 
 const MAX_TEXT_LENGTH = 50;
 const RATE_BURST = 3; // 令牌桶：最多連發 3 則
 const RATE_REFILL_MS = 2000; // 之後每 2 秒補一則的額度
+const IP_INTERVAL_MS = 1500; // 同 IP 最短發送間隔（跨分頁／連線都算同一人）
 const HISTORY_MAX = 4000; // 每頻道走勢歷史點數上限
+
+// 同 IP 節流：記錄每個 IP 上次發送時間，擋開多分頁／腳本繞過單一連線的令牌桶。
+const ipLastSent = new Map();
+// 定期清掉過期紀錄，避免 Map 無限長大（unref 不擋程序結束）
+setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [ip, t] of ipLastSent) if (t < cutoff) ipLastSent.delete(ip);
+}, 60_000).unref();
+
+function clientIp(socket) {
+  // Render 等反向代理後，真實 IP 在 X-Forwarded-For 第一段
+  const xff = socket.handshake.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.length) return xff.split(',')[0].trim();
+  return socket.handshake.address || 'unknown';
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -157,6 +173,7 @@ io.on('connection', (socket) => {
   socket.join(`chan:${chKey}`);
   socket.data.channel = chKey;
   socket.data.room = room;
+  socket.data.ip = clientIp(socket);
   socket.data.tokens = RATE_BURST;
   socket.data.lastRefill = Date.now();
 
@@ -174,8 +191,17 @@ io.on('connection', (socket) => {
   io.to(room).emit('room-count', { room, count: ch.rooms.count(room) });
 
   socket.on('barrage', (payload) => {
-    // 令牌桶限流：擋洗版，也保護伺服器頻寬
     const now = Date.now();
+
+    // 同 IP 節流：1.5 秒內同一 IP（含多分頁／多連線）只准發一則
+    const ip = socket.data.ip;
+    const lastIp = ipLastSent.get(ip);
+    if (lastIp != null && now - lastIp < IP_INTERVAL_MS) {
+      socket.emit('rate-limited');
+      return;
+    }
+
+    // 令牌桶限流：擋洗版，也保護伺服器頻寬
     const refill = Math.floor((now - socket.data.lastRefill) / RATE_REFILL_MS);
     if (refill > 0) {
       socket.data.tokens = Math.min(RATE_BURST, socket.data.tokens + refill);
@@ -190,6 +216,7 @@ io.on('connection', (socket) => {
     if (!text) return;
 
     socket.data.tokens -= 1;
+    ipLastSent.set(ip, now);
     // 完全匿名：不帶任何身分識別。發送者已在本地顯示，只廣播給房間其他人
     socket.to(socket.data.room).emit('barrage', { text });
   });

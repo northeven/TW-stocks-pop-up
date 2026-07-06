@@ -24,7 +24,7 @@
   const composer = document.getElementById('composer');
   const toast = document.getElementById('toast');
 
-  let roomInfo = { room: '—', count: 0, capacity: 100 };
+  let roomInfo = { room: '—', count: 0, capacity: 200 };
 
   // ---- 即時走勢圖（畫在彈幕區背景的 Canvas）----
 
@@ -328,13 +328,30 @@
 
   // ---- 輸入 ----
 
+  const sendBtn = form.querySelector('button[type="submit"]');
+  const SEND_COOLDOWN_MS = 1500; // 與後端同 IP 節流一致：每 1.5 秒才能再發
+  let onCooldown = false;
+  let cooldownTimer;
+
+  function startCooldown() {
+    onCooldown = true;
+    sendBtn.disabled = true;
+    clearTimeout(cooldownTimer);
+    cooldownTimer = setTimeout(() => {
+      onCooldown = false;
+      sendBtn.disabled = false;
+    }, SEND_COOLDOWN_MS);
+  }
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (onCooldown) return;
     const text = input.value.trim();
     if (!text) return;
     socket.emit('barrage', { text });
     spawnDanmaku(text.slice(0, 50), { mine: true });
     input.value = '';
+    startCooldown();
     input.focus();
   });
 
