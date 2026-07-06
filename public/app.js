@@ -7,6 +7,13 @@
     a.classList.toggle('active', a.dataset.channel === channel);
   });
 
+  // 免責聲明：標示資料僅供參考與來源（依頻道）
+  const disclaimerEl = document.getElementById('disclaimer');
+  if (disclaimerEl) {
+    const src = channel === 'tsm' ? 'Yahoo Finance' : '臺灣證交所 MIS';
+    disclaimerEl.textContent = `資料僅供參考、非即時交易依據 · 來源：${src}`;
+  }
+
   const socket = io({ query: { channel } });
 
   // ---- DOM ----
