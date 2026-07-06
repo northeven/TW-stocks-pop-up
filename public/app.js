@@ -24,7 +24,7 @@
   const composer = document.getElementById('composer');
   const toast = document.getElementById('toast');
 
-  let roomInfo = { room: '—', count: 0, capacity: 200 };
+  let roomInfo = { room: '—', count: 0, capacity: 500 };
 
   // ---- 即時走勢圖（畫在彈幕區背景的 Canvas）----
 
@@ -329,7 +329,7 @@
   // ---- 輸入 ----
 
   const sendBtn = form.querySelector('button[type="submit"]');
-  const SEND_COOLDOWN_MS = 1500; // 與後端同 IP 節流一致：每 1.5 秒才能再發
+  const SEND_COOLDOWN_MS = 600; // 與後端同 IP 節流一致：每 0.6 秒才能再發
   let onCooldown = false;
   let cooldownTimer;
 

@@ -7,13 +7,13 @@ import { RoomManager } from './rooms.js';
 import { startMarketFeed, fetchTaiex, fetchYahoo } from './market.js';
 
 const PORT = Number(process.env.PORT) || 3000;
-const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 200;
+const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 500;
 const SIMULATE = process.env.SIMULATE === '1';
 
 const MAX_TEXT_LENGTH = 50;
 const RATE_BURST = 3; // 令牌桶：最多連發 3 則
 const RATE_REFILL_MS = 2000; // 之後每 2 秒補一則的額度
-const IP_INTERVAL_MS = 1500; // 同 IP 最短發送間隔（跨分頁／連線都算同一人）
+const IP_INTERVAL_MS = 600; // 同 IP 最短發送間隔（跨分頁／連線都算同一人）
 const HISTORY_MAX = 4000; // 每頻道走勢歷史點數上限
 
 // 同 IP 節流：記錄每個 IP 上次發送時間，擋開多分頁／腳本繞過單一連線的令牌桶。

@@ -9,4 +9,4 @@ services:
     startCommand: npm start
     envVars:
       - key: ROOM_CAPACITY
-        value: "200"
+        value: "500"
