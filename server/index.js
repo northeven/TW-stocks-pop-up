@@ -17,7 +17,7 @@ if (process.env.BLOCKED_WORDS) loadBlockedWords(process.env.BLOCKED_WORDS.split(
 const MAX_TEXT_LENGTH = 50;
 const RATE_BURST = 3; // 令牌桶：最多連發 3 則
 const RATE_REFILL_MS = 2000; // 之後每 2 秒補一則的額度
-const IP_INTERVAL_MS = 1200; // 同 IP 最短發送間隔（跨分頁／連線都算同一人）
+const IP_INTERVAL_MS = 3000; // 同 IP 最短發送間隔（跨分頁／連線都算同一人）
 const DUP_WINDOW_MS = 10_000; // 洗同句偵測視窗
 const DUP_LIMIT = 5; // 視窗內同一句超過這個次數就處罰
 const IP_PENALTY_MS = 30_000; // 洗同句的冷靜期
