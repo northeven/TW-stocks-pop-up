@@ -35,9 +35,23 @@
 
   const UP = '#f6465d';
   const DOWN = '#2ebd85';
-  const timeFmt = new Intl.DateTimeFormat('zh-Hant-TW', {
-    timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false,
+  // 交易時段（當地時間、以分鐘計）：時間軸固定攤開整段，尚未成交的時間留白。
+  const SESSION = channel === 'tsm'
+    ? { tz: 'America/New_York', open: 9 * 60 + 30, close: 16 * 60 } // 09:30–16:00 ET
+    : { tz: 'Asia/Taipei', open: 9 * 60, close: 13 * 60 + 30 };     // 09:00–13:30
+  const hmFmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: SESSION.tz, hour12: false, hour: '2-digit', minute: '2-digit',
   });
+  function minutesOfDay(t) {
+    let hh = 0;
+    let mm = 0;
+    for (const part of hmFmt.formatToParts(new Date(t))) {
+      if (part.type === 'hour') hh = Number(part.value);
+      else if (part.type === 'minute') mm = Number(part.value);
+    }
+    if (hh === 24) hh = 0; // 某些環境午夜回傳 24
+    return hh * 60 + mm;
+  }
 
   function drawChart() {
     const dpr = window.devicePixelRatio || 1;
@@ -55,12 +69,13 @@
     const pad = { top: 24, right: 64, bottom: 26, left: 12 };
     const iw = w - pad.left - pad.right;
     const ih = h - pad.top - pad.bottom;
-    // 右側留一小段空白，表示還在等未來的 tick
-    const futureGap = Math.min(iw * 0.24, 168);
-    const plotW = iw - futureGap;
 
     const t0 = chartPoints[0][0];
     const t1 = chartPoints[chartPoints.length - 1][0];
+    // 時間軸固定攤開整段交易時段，資料只填到「現在」；右側空白＝尚未到來的盤中時間，
+    // tick 因此維持原本密度、不被拉伸。以最後一筆為基準換算當地分鐘，避免逐點做時區轉換。
+    const lastMin = minutesOfDay(t1);
+    const localMin = (t) => lastMin + (t - t1) / 60000;
     let pMin = chartPrevClose;
     let pMax = chartPrevClose;
     for (const [, p] of chartPoints) {
@@ -71,7 +86,10 @@
     pMin -= span * 0.08;
     pMax += span * 0.08;
 
-    const x = (t) => pad.left + ((t - t0) / Math.max(t1 - t0, 1)) * plotW;
+    const x = (t) => {
+      const frac = (localMin(t) - SESSION.open) / (SESSION.close - SESSION.open);
+      return pad.left + Math.min(Math.max(frac, 0), 1) * iw;
+    };
     const y = (p) => pad.top + (1 - (p - pMin) / (pMax - pMin)) * ih;
 
     const last = chartPoints[chartPoints.length - 1][1];
@@ -94,6 +112,22 @@
       ctx.fillStyle = 'rgba(139, 148, 158, 0.7)';
       ctx.fillText(p.toFixed(dec), pad.left + iw + 8, gy);
     }
+
+    // 垂直時間格線 + 整點標籤（攤開整段交易時間）
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    for (let hr = Math.ceil((SESSION.open + 1) / 60); hr * 60 <= SESSION.close; hr++) {
+      const gx = pad.left + ((hr * 60 - SESSION.open) / (SESSION.close - SESSION.open)) * iw;
+      ctx.strokeStyle = 'rgba(139, 148, 158, 0.12)';
+      ctx.beginPath();
+      ctx.moveTo(gx, pad.top);
+      ctx.lineTo(gx, pad.top + ih);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(139, 148, 158, 0.7)';
+      ctx.fillText(String(hr), gx, h - 6);
+    }
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
 
     // 昨收基準虛線
     if (chartPrevClose >= pMin && chartPrevClose <= pMax) {
@@ -134,14 +168,6 @@
     ctx.arc(x(t1), y(last), 3.5, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
-
-    // 時間軸（起訖）
-    ctx.fillStyle = 'rgba(139, 148, 158, 0.7)';
-    ctx.textBaseline = 'bottom';
-    ctx.textAlign = 'left';
-    ctx.fillText(timeFmt.format(new Date(t0)), pad.left, h - 6);
-    ctx.textAlign = 'right';
-    ctx.fillText(timeFmt.format(new Date(t1)), x(t1), h - 6);
   }
 
   new ResizeObserver(drawChart).observe(canvas);
