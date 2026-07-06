@@ -54,6 +54,9 @@
     const pad = { top: 24, right: 64, bottom: 26, left: 12 };
     const iw = w - pad.left - pad.right;
     const ih = h - pad.top - pad.bottom;
+    // 右側留一小段空白，表示還在等未來的 tick
+    const futureGap = Math.min(iw * 0.24, 168);
+    const plotW = iw - futureGap;
 
     const t0 = chartPoints[0][0];
     const t1 = chartPoints[chartPoints.length - 1][0];
@@ -67,7 +70,7 @@
     pMin -= span * 0.08;
     pMax += span * 0.08;
 
-    const x = (t) => pad.left + ((t - t0) / Math.max(t1 - t0, 1)) * iw;
+    const x = (t) => pad.left + ((t - t0) / Math.max(t1 - t0, 1)) * plotW;
     const y = (p) => pad.top + (1 - (p - pMin) / (pMax - pMin)) * ih;
 
     const last = chartPoints[chartPoints.length - 1][1];
@@ -137,7 +140,7 @@
     ctx.textAlign = 'left';
     ctx.fillText(timeFmt.format(new Date(t0)), pad.left, h - 6);
     ctx.textAlign = 'right';
-    ctx.fillText(timeFmt.format(new Date(t1)), pad.left + iw, h - 6);
+    ctx.fillText(timeFmt.format(new Date(t1)), x(t1), h - 6);
   }
 
   new ResizeObserver(drawChart).observe(canvas);
@@ -243,7 +246,12 @@
     el.addEventListener('animationend', () => el.remove());
   }
 
-  socket.on('barrage', ({ text }) => spawnDanmaku(text));
+  // 分頁在背景時不渲染彈幕：CSS 動畫會被節流、animationend 可能不觸發，
+  // 徒增游離節點與 GPU 負擔。回到前景後的新彈幕才繼續顯示。
+  socket.on('barrage', ({ text }) => {
+    if (document.hidden) return;
+    spawnDanmaku(text);
+  });
 
   socket.on('rate-limited', () => showToast('發太快了，休息一下再發 🙏'));
 
