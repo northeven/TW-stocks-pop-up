@@ -54,6 +54,23 @@ body {
   border-color: #58a6ff;
 }
 
+#credit {
+  margin-left: auto;
+  align-self: center;
+  padding: 4px 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+#credit:hover { color: var(--text); opacity: 1; }
+
+@media (max-width: 600px) {
+  #credit { font-size: 11px; padding: 4px 6px; }
+}
+
 .ticker-name {
   display: flex;
   align-items: center;
