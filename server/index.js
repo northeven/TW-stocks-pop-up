@@ -5,11 +5,14 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { RoomManager } from './rooms.js';
 import { startMarketFeed, fetchTaiex, fetchYahoo } from './market.js';
-import { screen, normalize } from './filter.js';
+import { screen, normalize, addBlockedWord, removeBlockedWord, listBlockedWords, loadBlockedWords } from './filter.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 500;
 const SIMULATE = process.env.SIMULATE === '1';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || ''; // 設了才會開放 admin API
+// 啟動時可用環境變數帶入封鎖詞（逗號分隔），比執行期動態增刪更持久（改 env → 重啟）
+if (process.env.BLOCKED_WORDS) loadBlockedWords(process.env.BLOCKED_WORDS.split(','));
 
 const MAX_TEXT_LENGTH = 50;
 const RATE_BURST = 3; // 令牌桶：最多連發 3 則
@@ -124,6 +127,42 @@ app.get('/stats', (_req, res) => {
     };
   }
   res.json({ capacity: ROOM_CAPACITY, channels: perChannel });
+});
+
+// ---- Admin：執行期臨時增刪封鎖詞（不必重部署）----
+// 需設環境變數 ADMIN_TOKEN 才開放；用 ?token= 或標頭 x-admin-token 驗證。
+//   GET    /admin/blocklist?token=xxx
+//   POST   /admin/blocklist?token=xxx&word=網球拍拍   （或 JSON body {"word":"..."}）
+//   DELETE /admin/blocklist?token=xxx&word=網球拍拍
+function requireAdmin(req, res) {
+  if (!ADMIN_TOKEN) {
+    res.status(404).json({ error: 'admin api 未啟用（未設 ADMIN_TOKEN）' });
+    return false;
+  }
+  const tok = req.get('x-admin-token') || req.query.token;
+  if (tok !== ADMIN_TOKEN) {
+    res.status(403).json({ error: 'forbidden' });
+    return false;
+  }
+  return true;
+}
+function reqWord(req) {
+  return (req.body?.word ?? req.query.word ?? '').toString();
+}
+
+app.get('/admin/blocklist', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ words: listBlockedWords() });
+});
+app.post('/admin/blocklist', express.json({ limit: '4kb' }), (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const ok = addBlockedWord(reqWord(req));
+  res.status(ok ? 200 : 400).json({ ok, words: listBlockedWords() });
+});
+app.delete('/admin/blocklist', express.json({ limit: '4kb' }), (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const ok = removeBlockedWord(reqWord(req));
+  res.json({ ok, words: listBlockedWords() });
 });
 
 // ---- 歷史回補：先把今日 9:00 至今的分線價格填進來，再開始接即時 tick ----

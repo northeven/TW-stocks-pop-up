@@ -51,6 +51,52 @@ const SCAM_RE =
 const NSFW_RE =
   /約炮|約砲|外送茶|賣淫|嫖妓|嫖娼|可外約|顏射|插穴|裸聊|打手槍|應召站|幼交|戀童|迷姦|輪姦|強姦|一夜情(?![勢懷況])/;
 
+// ---- 使用者指定封鎖片語（執行期可動態增刪，不必重啟／重部署）----
+// 存 compact 形式（已去分隔符），比對時對 norm 與 comp 都測，連拆字空格也擋。
+// 透過 index.js 的 admin API 即時增刪；預設種入 網球拍拍，另可由 BLOCKED_WORDS 環境變數帶入。
+const MAX_BLOCKED = 500; // 上限，避免 regex 過大或被灌爆
+const blockedWords = new Set();
+let blockedRe = null; // 依 blockedWords 編譯；空集合為 null
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function rebuildBlocked() {
+  blockedRe = blockedWords.size ? new RegExp([...blockedWords].map(escapeRe).join('|')) : null;
+}
+// 把輸入詞正規化並去分隔符後當 key；空字串或過長回 null
+function blockKey(raw) {
+  const k = compact(normalize(String(raw))).trim();
+  return k && k.length <= 50 ? k : null;
+}
+
+export function addBlockedWord(raw) {
+  const k = blockKey(raw);
+  if (!k || blockedWords.size >= MAX_BLOCKED) return false;
+  blockedWords.add(k);
+  rebuildBlocked();
+  return true;
+}
+export function removeBlockedWord(raw) {
+  const k = blockKey(raw);
+  const ok = k ? blockedWords.delete(k) : false;
+  rebuildBlocked();
+  return ok;
+}
+export function listBlockedWords() {
+  return [...blockedWords];
+}
+export function loadBlockedWords(words) {
+  for (const w of words) {
+    const k = blockKey(w);
+    if (k && blockedWords.size < MAX_BLOCKED) blockedWords.add(k);
+  }
+  rebuildBlocked();
+}
+
+// 預設封鎖詞（已知騷擾／遊戲代練廣告；redeploy 後仍在）
+loadBlockedWords(['網球拍拍', '楓之谷', '新楓之谷']);
+
 // 回傳 { ok:true } 或 { ok:false, reason }。text 應為已 sanitize（去控制字元、trim、截長）的字串。
 export function screen(text) {
   const norm = normalize(text);
@@ -60,6 +106,7 @@ export function screen(text) {
   for (const re of COMPACT_RES) if (re.test(comp)) return { ok: false, reason: 'contact' };
   if (SCAM_RE.test(norm) || SCAM_RE.test(comp)) return { ok: false, reason: 'scam' };
   if (NSFW_RE.test(norm)) return { ok: false, reason: 'nsfw' };
+  if (blockedRe && (blockedRe.test(norm) || blockedRe.test(comp))) return { ok: false, reason: 'blocked' };
 
   return { ok: true };
 }

@@ -34,14 +34,17 @@ npm run dev        # 開發模式：SIMULATE=1，用模擬行情
 | `PORT` | `3000` | 伺服器埠號 |
 | `ROOM_CAPACITY` | `500` | 每個房間的人數上限 |
 | `SIMULATE` | 關 | 設 `1` 強制使用模擬行情 |
+| `ADMIN_TOKEN` | 關 | 設了才開放臨時封鎖詞 admin API（見下） |
+| `BLOCKED_WORDS` | 關 | 啟動時帶入的封鎖詞（逗號分隔），比執行期動態增刪更持久 |
 
 ## 架構
 
 ```
 server/
-  index.js    Express + Socket.IO 主程式（頻道、分房、限流、廣播、走勢歷史）
+  index.js    Express + Socket.IO 主程式（頻道、分房、限流、廣播、走勢歷史、admin API）
   market.js   行情來源（證交所 / Yahoo Finance）+ 模擬行情備援
   rooms.js    房間管理（滿房自動開新房、空房回收）
+  filter.js   內容過濾（正規化、廣告／色情、可動態增刪的封鎖詞）
 public/
   index.html  單頁前端（/ 與 /tsm 共用，依路徑決定頻道）
   style.css   深色主題、彈幕動畫
@@ -69,6 +72,28 @@ public/
   }
 }
 ```
+
+## 臨時封鎖詞（admin API）
+
+不必改 code 或重部署，就能即時增刪封鎖片語（命中即靜默丟棄，含拆字空格）。需先設環境變數
+`ADMIN_TOKEN`（沒設時 API 回 404、等於關閉）。詞會存在記憶體，重啟／重部署會回到程式內建的預設清單；
+要持久就寫進 `BLOCKED_WORDS` 環境變數或原始碼預設清單。
+
+```bash
+TOKEN=你的ADMIN_TOKEN
+BASE=https://你的網址/admin/blocklist
+
+# 列出目前封鎖詞
+curl "$BASE?token=$TOKEN"
+
+# 新增（建議用 JSON body，中文不必手動 URL-encode）
+curl -X POST "$BASE?token=$TOKEN" -H 'content-type: application/json' -d '{"word":"要擋的詞"}'
+
+# 移除
+curl -X DELETE "$BASE?token=$TOKEN" -H 'content-type: application/json' -d '{"word":"要擋的詞"}'
+```
+
+內建預設封鎖：`網球拍拍`、`楓之谷`、`新楓之谷`。
 
 ## 免費部署（Render）
 

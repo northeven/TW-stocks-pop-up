@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { screen } from './filter.js';
+import { screen, addBlockedWord, removeBlockedWord, listBlockedWords } from './filter.js';
 
 // 應該被擋（廣告／聯絡方式／詐騙話術），含常見拆字與全形規避
 const SHOULD_BLOCK = [
@@ -22,6 +22,11 @@ const SHOULD_BLOCK = [
   '應召站便宜',
   '強姦犯滾出去',
   '一夜情約起來',
+  // 使用者指定封鎖片語（預設種入）
+  '網球拍拍',
+  '網 球 拍 拍',   // 拆字
+  '楓之谷代練',
+  '新楓之谷金幣便宜賣',
 ];
 
 // 不該被擋（正常台股討論與情緒用語，避免誤殺）
@@ -61,4 +66,17 @@ test('放行正常台股討論（不誤殺）', () => {
   for (const t of SHOULD_PASS) {
     assert.equal(screen(t).ok, true, `不該擋卻攔下：「${t}」`);
   }
+});
+
+test('執行期動態增刪封鎖詞', () => {
+  const w = '臨時測試詞xyz';
+  assert.equal(screen(w).ok, true, '加入前應放行');
+  assert.equal(addBlockedWord(w), true);
+  assert.equal(screen(w).ok, false, '加入後應攔截');
+  assert.equal(screen('臨時 測試 詞 x y z').ok, false, '拆字也要擋');
+  assert.ok(listBlockedWords().includes('臨時測試詞xyz'));
+  assert.equal(removeBlockedWord(w), true);
+  assert.equal(screen(w).ok, true, '移除後應恢復放行');
+  // 預設種入的詞仍在
+  assert.equal(screen('網球拍拍').ok, false, '預設封鎖詞應保留');
 });

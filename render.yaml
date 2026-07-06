@@ -10,3 +10,6 @@ services:
     envVars:
       - key: ROOM_CAPACITY
         value: "500"
+      # 開啟臨時封鎖詞 admin API：Render 自動產生一組密鑰（到 dashboard → Environment 讀取）
+      - key: ADMIN_TOKEN
+        generateValue: true
