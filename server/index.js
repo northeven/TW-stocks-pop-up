@@ -22,6 +22,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CHANNEL_CONFIG = {
   taiex: {
     fetcher: fetchTaiex,
+    // TWSE MIS 無盤中歷史，改用 Yahoo ^TWII 回補今日 9:00 至今的分線價格線
+    seed: () => fetchYahoo('^TWII', '發行量加權股價指數'),
     sim: { base: 23000, name: '發行量加權股價指數' },
   },
   tsm: {
@@ -98,6 +100,26 @@ app.get('/stats', (_req, res) => {
   }
   res.json({ capacity: ROOM_CAPACITY, channels: perChannel });
 });
+
+// ---- 歷史回補：先把今日 9:00 至今的分線價格填進來，再開始接即時 tick ----
+// 指數在 Yahoo 沒有成交量，故僅回補價格線；量能副圖自伺服器啟動後才累積。
+
+async function seedHistory(ch) {
+  if (!ch.cfg.seed) return;
+  try {
+    const q = await ch.cfg.seed();
+    if (q.series?.length && ch.history.length === 0) {
+      ch.prevClose = q.prevClose;
+      ch.history = q.series.slice();
+      console.log(`[seed] ${ch.key} 回補 ${ch.history.length} 筆分線（起 ${new Date(ch.history[0][0]).toLocaleTimeString('zh-TW')}）`);
+    }
+  } catch (err) {
+    console.warn(`[seed] ${ch.key} 歷史回補失敗: ${err.message}`);
+  }
+}
+
+// 先回補再開輪詢，避免第一筆即時 tick 搶先寫入導致略過回補
+if (!SIMULATE) await Promise.all(Object.values(channels).map(seedHistory));
 
 // ---- 行情輪詢：每個頻道一條，全站共用，對該頻道所有連線廣播 ----
 

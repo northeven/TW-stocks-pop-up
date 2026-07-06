@@ -43,7 +43,8 @@ export async function fetchTaiex() {
     low: num(row.l),
     open: num(row.o),
     time: num(row.tlong) ?? Date.now(),
-    cumVolume: num(row.v), // 當日累積成交量（張），交易量副圖用
+    // 指數沒有 v（成交量）欄位，改用 m（當日累積成交金額）當交易量副圖來源
+    cumVolume: num(row.m) ?? num(row.v),
   };
 }
 

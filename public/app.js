@@ -82,8 +82,14 @@
     // tick 因此維持原本密度、不被拉伸。以最後一筆為基準換算當地分鐘，避免逐點做時區轉換。
     const lastMin = minutesOfDay(t1);
     const localMin = (t) => lastMin + (t - t1) / 60000;
-    // 第一個 tick 預留為昨收（畫在開盤時間點），一開盤就能看到初始漲跌折線
-    const openT = t1 + (SESSION.open - lastMin) * 60000;
+    // 左邊界從第一筆資料起（Render 冷啟動可能盤中才開始收），昨收起點就貼齊最左；
+    // 右邊界固定為收盤時間，留白＝尚未到來的盤中時間。
+    const firstMin = localMin(chartPoints[0][0]);
+    const domainMax = SESSION.close;
+    const leftMargin = Math.max((domainMax - firstMin) * 0.02, 1); // 給昨收起點一點寬度畫初始漲跌
+    const domainMin = firstMin - leftMargin;
+    // 第一個 tick 預留為昨收，畫在最左邊，一開始就能看到初始漲跌折線
+    const openT = chartPoints[0][0] - leftMargin * 60000;
     const pts = [[openT, chartPrevClose], ...chartPoints];
 
     // 垂直範圍以昨收為中心，預設預留上下 1.3%；當日振幅超過就對稱動態拉高，
@@ -98,7 +104,7 @@
     const pMax = chartPrevClose + half;
 
     const x = (t) => {
-      const frac = (localMin(t) - SESSION.open) / (SESSION.close - SESSION.open);
+      const frac = (localMin(t) - domainMin) / (domainMax - domainMin);
       return pad.left + Math.min(Math.max(frac, 0), 1) * iw;
     };
     const y = (p) => pad.top + (1 - (p - pMin) / (pMax - pMin)) * priceH;
@@ -127,8 +133,8 @@
     // 垂直時間格線 + 整點標籤（攤開整段交易時間）
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    for (let hr = Math.ceil((SESSION.open + 1) / 60); hr * 60 <= SESSION.close; hr++) {
-      const gx = pad.left + ((hr * 60 - SESSION.open) / (SESSION.close - SESSION.open)) * iw;
+    for (let hr = Math.ceil((domainMin + 1) / 60); hr * 60 <= domainMax; hr++) {
+      const gx = pad.left + ((hr * 60 - domainMin) / (domainMax - domainMin)) * iw;
       ctx.strokeStyle = 'rgba(139, 148, 158, 0.12)';
       ctx.beginPath();
       ctx.moveTo(gx, pad.top);
@@ -154,25 +160,29 @@
       ctx.fillText(`昨收 ${chartPrevClose.toFixed(dec)}`, pad.left + 4, by - 9);
     }
 
-    // 走勢線（含開盤昨收起點）+ 底下漸層填色
-    ctx.beginPath();
+    // 走勢線（含開盤昨收起點）：以昨收為界，之上紅、之下綠，用裁切自動切色
+    const byLevel = y(chartPrevClose); // 昨收在畫面上的 y（因置中，約在中央）
+    const linePath = new Path2D();
     for (let i = 0; i < pts.length; i++) {
       const [t, p] = pts[i];
-      i === 0 ? ctx.moveTo(x(t), y(p)) : ctx.lineTo(x(t), y(p));
+      i === 0 ? linePath.moveTo(x(t), y(p)) : linePath.lineTo(x(t), y(p));
     }
-    ctx.strokeStyle = color;
+    // 面積填色：線與昨收基準線之間，之上淡紅、之下淡綠
+    const areaPath = new Path2D(linePath);
+    areaPath.lineTo(x(t1), byLevel);
+    areaPath.lineTo(x(openT), byLevel);
+    areaPath.closePath();
+
+    const clipTop = () => { ctx.beginPath(); ctx.rect(pad.left, pad.top, iw, byLevel - pad.top); ctx.clip(); };
+    const clipBottom = () => { ctx.beginPath(); ctx.rect(pad.left, byLevel, iw, pad.top + priceH - byLevel); ctx.clip(); };
+
+    ctx.save(); clipTop(); ctx.fillStyle = UP + '22'; ctx.fill(areaPath); ctx.restore();
+    ctx.save(); clipBottom(); ctx.fillStyle = DOWN + '22'; ctx.fill(areaPath); ctx.restore();
+
     ctx.lineWidth = 1.1;
     ctx.lineJoin = 'round';
-    ctx.stroke();
-
-    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + priceH);
-    grad.addColorStop(0, color + '2e');
-    grad.addColorStop(1, color + '00');
-    ctx.lineTo(x(t1), pad.top + priceH);
-    ctx.lineTo(x(openT), pad.top + priceH);
-    ctx.closePath();
-    ctx.fillStyle = grad;
-    ctx.fill();
+    ctx.save(); clipTop(); ctx.strokeStyle = UP; ctx.stroke(linePath); ctx.restore();
+    ctx.save(); clipBottom(); ctx.strokeStyle = DOWN; ctx.stroke(linePath); ctx.restore();
 
     // 最新價光點
     ctx.beginPath();
