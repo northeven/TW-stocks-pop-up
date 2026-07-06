@@ -36,8 +36,9 @@ for (const [key, cfg] of Object.entries(CHANNEL_CONFIG)) {
     key,
     cfg,
     rooms: new RoomManager({ capacity: ROOM_CAPACITY, prefix: `${key}:` }),
-    history: [], // [timestamp, price]
+    history: [], // [timestamp, price, 該筆成交量]
     prevClose: null,
+    lastCumVolume: null, // 上一筆累積成交量，用來換算單筆量
     latest: null,
   };
 }
@@ -47,14 +48,24 @@ function recordQuote(ch, q) {
     // 昨收變了代表換交易日，重新開始畫
     ch.prevClose = q.prevClose;
     ch.history.length = 0;
+    ch.lastCumVolume = null;
   }
-  // Yahoo 會附當日分線歷史，冷啟動直接整段填入
+  // Yahoo 會附當日分線歷史（含各分鐘成交量），冷啟動直接整段填入
   if (ch.history.length === 0 && q.series?.length) {
     ch.history.push(...q.series);
   }
   const last = ch.history[ch.history.length - 1];
   if (!last || last[0] !== q.time) {
-    ch.history.push([q.time, q.price]); // 收盤後同一筆會重複，去重
+    // 來源給的是累積量，換算成這一筆的單筆量（首筆或跨日先記 0）
+    let barVolume = 0;
+    if (q.cumVolume != null) {
+      barVolume = ch.lastCumVolume == null ? 0 : Math.max(0, q.cumVolume - ch.lastCumVolume);
+      ch.lastCumVolume = q.cumVolume;
+    }
+    q.barVolume = barVolume; // 隨 market 事件送給前端即時附加
+    ch.history.push([q.time, q.price, barVolume]); // 收盤後同一筆會重複，去重
+  } else {
+    q.barVolume = last[2] ?? 0;
   }
   if (ch.history.length > HISTORY_MAX) {
     ch.history.splice(0, ch.history.length - HISTORY_MAX);
@@ -95,7 +106,8 @@ const stoppers = Object.values(channels).map((ch) =>
     (quote) => {
       ch.latest = quote;
       recordQuote(ch, quote);
-      const { series, ...lean } = quote; // series 很大，只在連線時隨歷史送
+      // series 很大只在連線時隨歷史送；cumVolume 前端用不到（改用 barVolume）
+      const { series, cumVolume, ...lean } = quote;
       io.to(`chan:${ch.key}`).emit('market', lean);
     },
     { simulate: SIMULATE, fetcher: ch.cfg.fetcher, sim: ch.cfg.sim },
@@ -133,7 +145,7 @@ io.on('connection', (socket) => {
     capacity: ROOM_CAPACITY,
   });
   if (ch.latest) {
-    const { series, ...lean } = ch.latest;
+    const { series, cumVolume, ...lean } = ch.latest;
     socket.emit('market', lean);
   }
   socket.emit('market-history', { points: ch.history, prevClose: ch.prevClose });

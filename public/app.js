@@ -35,6 +35,7 @@
 
   const UP = '#f6465d';
   const DOWN = '#2ebd85';
+  const volFmt = new Intl.NumberFormat('zh-Hant-TW', { notation: 'compact', maximumFractionDigits: 1 });
   // 交易時段（當地時間、以分鐘計）：時間軸固定攤開整段，尚未成交的時間留白。
   const SESSION = channel === 'tsm'
     ? { tz: 'America/New_York', open: 9 * 60 + 30, close: 16 * 60 } // 09:30–16:00 ET
@@ -69,6 +70,11 @@
     const pad = { top: 24, right: 64, bottom: 26, left: 12 };
     const iw = w - pad.left - pad.right;
     const ih = h - pad.top - pad.bottom;
+    // 下方切一條副圖畫交易量，價格線只用上半部
+    const volH = Math.round(ih * 0.16);
+    const volGap = 8;
+    const priceH = ih - volH - volGap;
+    const volBase = pad.top + ih; // 量能副圖的底線
 
     const t0 = chartPoints[0][0];
     const t1 = chartPoints[chartPoints.length - 1][0];
@@ -90,7 +96,7 @@
       const frac = (localMin(t) - SESSION.open) / (SESSION.close - SESSION.open);
       return pad.left + Math.min(Math.max(frac, 0), 1) * iw;
     };
-    const y = (p) => pad.top + (1 - (p - pMin) / (pMax - pMin)) * ih;
+    const y = (p) => pad.top + (1 - (p - pMin) / (pMax - pMin)) * priceH;
 
     const last = chartPoints[chartPoints.length - 1][1];
     const color = last >= chartPrevClose ? UP : DOWN;
@@ -154,11 +160,11 @@
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ih);
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + priceH);
     grad.addColorStop(0, color + '2e');
     grad.addColorStop(1, color + '00');
-    ctx.lineTo(x(t1), pad.top + ih);
-    ctx.lineTo(x(t0), pad.top + ih);
+    ctx.lineTo(x(t1), pad.top + priceH);
+    ctx.lineTo(x(t0), pad.top + priceH);
     ctx.closePath();
     ctx.fillStyle = grad;
     ctx.fill();
@@ -168,6 +174,30 @@
     ctx.arc(x(t1), y(last), 3.5, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
+
+    // ---- 交易量副圖 ----
+    let maxVol = 0;
+    for (const pt of chartPoints) {
+      if (pt[2] > maxVol) maxVol = pt[2];
+    }
+    if (maxVol > 0) {
+      for (let i = 0; i < chartPoints.length; i++) {
+        const v = chartPoints[i][2];
+        if (!v) continue;
+        const bx = x(chartPoints[i][0]);
+        const nx = i + 1 < chartPoints.length ? x(chartPoints[i + 1][0]) : bx + 1;
+        const bw = Math.max(1, nx - bx);
+        const bh = (v / maxVol) * volH;
+        // 顏色跟著當筆漲跌走（相對昨收）
+        ctx.fillStyle = (chartPoints[i][1] >= chartPrevClose ? UP : DOWN) + '66';
+        ctx.fillRect(bx, volBase - bh, bw, bh);
+      }
+      // 量能最大值標籤
+      ctx.fillStyle = 'rgba(139, 148, 158, 0.7)';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(volFmt.format(maxVol), pad.left + 2, volBase - volH);
+    }
   }
 
   new ResizeObserver(drawChart).observe(canvas);
@@ -205,7 +235,7 @@
     }
     const lastPt = chartPoints[chartPoints.length - 1];
     if (!lastPt || lastPt[0] !== q.time) {
-      chartPoints.push([q.time, q.price]);
+      chartPoints.push([q.time, q.price, q.barVolume ?? 0]);
       if (chartPoints.length > 4000) chartPoints.shift();
       drawChart();
     }

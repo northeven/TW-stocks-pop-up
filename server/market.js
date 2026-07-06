@@ -43,6 +43,7 @@ export async function fetchTaiex() {
     low: num(row.l),
     open: num(row.o),
     time: num(row.tlong) ?? Date.now(),
+    cumVolume: num(row.v), // 當日累積成交量（張），交易量副圖用
   };
 }
 
@@ -62,12 +63,13 @@ export async function fetchYahoo(symbol, displayName) {
   const prevClose = num(meta.chartPreviousClose) ?? num(meta.previousClose);
   if (price === null || prevClose === null) throw new Error('Yahoo 回應缺少價格欄位');
 
-  // 當日分線歷史（給線圖秒載入用）
+  // 當日分線歷史（給線圖秒載入用）：[時間, 收盤價, 該分鐘成交量]
   const ts = result.timestamp || [];
   const closes = result.indicators?.quote?.[0]?.close || [];
+  const volumes = result.indicators?.quote?.[0]?.volume || [];
   const series = [];
   for (let i = 0; i < ts.length; i++) {
-    if (num(closes[i]) !== null) series.push([ts[i] * 1000, closes[i]]);
+    if (num(closes[i]) !== null) series.push([ts[i] * 1000, closes[i], num(volumes[i]) ?? 0]);
   }
 
   const change = price - prevClose;
@@ -84,6 +86,7 @@ export async function fetchYahoo(symbol, displayName) {
     time: (num(meta.regularMarketTime) ?? Math.floor(Date.now() / 1000)) * 1000,
     currency: meta.currency || 'USD',
     marketState: meta.marketState, // PRE / REGULAR / POST / CLOSED
+    cumVolume: num(meta.regularMarketVolume), // 當日累積成交量，交易量副圖用
     series,
   };
 }
@@ -97,6 +100,8 @@ function createSimulator({ base = 23000, name = '模擬指數' } = {}) {
   let low = price;
   const open = price;
   const step = base * 0.001; // 波動幅度跟價位成比例，指數和個股都合理
+  let cumVolume = 0;
+  let ticks = 0;
 
   return function tick() {
     // 帶一點向昨收回歸的力道，避免漂太遠
@@ -104,6 +109,9 @@ function createSimulator({ base = 23000, name = '模擬指數' } = {}) {
     price = Math.max(base * 0.5, price + drift + (Math.random() - 0.5) * step);
     high = Math.max(high, price);
     low = Math.min(low, price);
+    // 假成交量：開盤爆量、之後逐漸收斂，貼近真實盤中量能分布
+    ticks += 1;
+    cumVolume += Math.round(base * Math.random() * (1 + 4 / ticks));
     const change = price - prevClose;
     const r = (v) => Math.round(v * 100) / 100;
     return {
@@ -117,6 +125,7 @@ function createSimulator({ base = 23000, name = '模擬指數' } = {}) {
       low: r(low),
       open: r(open),
       time: Date.now(),
+      cumVolume,
     };
   };
 }
