@@ -21,6 +21,7 @@
   const roomBadge = document.getElementById('room-badge');
   const form = document.getElementById('barrage-form');
   const input = document.getElementById('barrage-input');
+  const composer = document.getElementById('composer');
   const toast = document.getElementById('toast');
 
   let roomInfo = { room: '—', count: 0, capacity: 100 };
@@ -266,6 +267,19 @@
     input.value = '';
     input.focus();
   });
+
+  // ---- 手機鍵盤：讓輸入列緊貼鍵盤上緣 ----
+  // iOS Safari 開鍵盤時不會縮小版面（layout viewport 維持滿高），輸入列會被留在
+  // 鍵盤下方而露出大片空白。改用 visualViewport 量出鍵盤遮住的高度，把輸入列上移貼齊。
+  const vv = window.visualViewport;
+  if (vv) {
+    const stickComposer = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      composer.style.transform = inset ? `translateY(-${inset}px)` : '';
+    };
+    vv.addEventListener('resize', stickComposer);
+    vv.addEventListener('scroll', stickComposer);
+  }
 
   let toastTimer;
   function showToast(msg) {
