@@ -39,6 +39,18 @@ const COMPACT_RES = [
 const SCAM_RE =
   /娛樂城|百家樂|博弈|包牌|運彩|帶單|喊單|保證獲利|穩賺|內線明牌|飆股群|抱團群|老師帶|加入群組|加入我們|免費諮詢|穩定獲利/;
 
+// ---- 第 4 層：露骨色情／性招攬詞（已逐詞審過財經/日常 FP，命中即靜默丟棄）----
+// 收詞原則：只收「股市聊天幾乎不會出現、且無常見無辜母字串」的詞。
+// 只比對 norm（保留分隔符），刻意不比對 compact——避免「外送 茶飲 → 外送茶」這類
+// 分隔符收合造成的誤殺。以下詞已逐一審過中文子字串 FP：
+//   一夜情 用 (?![勢懷況]) 擋掉「一夜情勢/情懷/情況」。
+// FP 高、無法乾淨界定的詞刻意不收（見 docs/moderation.md「待審清單」）：
+//   口爆(缺口爆量) 性交易/性服務(彈性/理性…) 援交(支援交流) 群交(客群交易)
+//   內射(禁區內射) 做愛(做愛心) 肉棒(蟹肉棒) 性侵(個性侵略) 屌(好屌=讚美)
+//   自慰(獨自慰問/各自慰勞) 援妹(支援妹妹) 叫小姐(叫小姐過來)…
+const NSFW_RE =
+  /約炮|約砲|外送茶|賣淫|嫖妓|嫖娼|可外約|顏射|插穴|裸聊|打手槍|應召站|幼交|戀童|迷姦|輪姦|強姦|一夜情(?![勢懷況])/;
+
 // 回傳 { ok:true } 或 { ok:false, reason }。text 應為已 sanitize（去控制字元、trim、截長）的字串。
 export function screen(text) {
   const norm = normalize(text);
@@ -47,6 +59,7 @@ export function screen(text) {
   if (URL_RE.test(norm) || URL_RE.test(comp)) return { ok: false, reason: 'url' };
   for (const re of COMPACT_RES) if (re.test(comp)) return { ok: false, reason: 'contact' };
   if (SCAM_RE.test(norm) || SCAM_RE.test(comp)) return { ok: false, reason: 'scam' };
+  if (NSFW_RE.test(norm)) return { ok: false, reason: 'nsfw' };
 
   return { ok: true };
 }

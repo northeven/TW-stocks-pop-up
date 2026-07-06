@@ -5,7 +5,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { RoomManager } from './rooms.js';
 import { startMarketFeed, fetchTaiex, fetchYahoo } from './market.js';
-import { screen } from './filter.js';
+import { screen, normalize } from './filter.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOM_CAPACITY = Number(process.env.ROOM_CAPACITY) || 500;
@@ -14,15 +14,21 @@ const SIMULATE = process.env.SIMULATE === '1';
 const MAX_TEXT_LENGTH = 50;
 const RATE_BURST = 3; // 令牌桶：最多連發 3 則
 const RATE_REFILL_MS = 2000; // 之後每 2 秒補一則的額度
-const IP_INTERVAL_MS = 600; // 同 IP 最短發送間隔（跨分頁／連線都算同一人）
+const IP_INTERVAL_MS = 1200; // 同 IP 最短發送間隔（跨分頁／連線都算同一人）
+const DUP_WINDOW_MS = 10_000; // 洗同句偵測視窗
+const DUP_LIMIT = 5; // 視窗內同一句超過這個次數就處罰
+const IP_PENALTY_MS = 30_000; // 洗同句的冷靜期
 const HISTORY_MAX = 4000; // 每頻道走勢歷史點數上限
 
 // 同 IP 節流：記錄每個 IP 上次發送時間，擋開多分頁／腳本繞過單一連線的令牌桶。
 const ipLastSent = new Map();
+// 洗同句偵測：ip -> { norm, hits:[時間戳...], until:冷靜到期時間, ts:最後更新 }
+const ipDup = new Map();
 // 定期清掉過期紀錄，避免 Map 無限長大（unref 不擋程序結束）
 setInterval(() => {
   const cutoff = Date.now() - 60_000;
   for (const [ip, t] of ipLastSent) if (t < cutoff) ipLastSent.delete(ip);
+  for (const [ip, r] of ipDup) if (r.ts < cutoff && (!r.until || r.until < cutoff)) ipDup.delete(ip);
 }, 60_000).unref();
 
 function clientIp(socket) {
@@ -195,9 +201,17 @@ io.on('connection', (socket) => {
 
   socket.on('barrage', (payload) => {
     const now = Date.now();
-
-    // 同 IP 節流：1.5 秒內同一 IP（含多分頁／多連線）只准發一則
     const ip = socket.data.ip;
+
+    // 洗同句冷靜期：被罰的 IP 在冷靜期內一律擋（回 toast 讓真人知道）
+    const dup = ipDup.get(ip);
+    if (dup?.until && now < dup.until) {
+      ch.blocked += 1;
+      socket.emit('rate-limited');
+      return;
+    }
+
+    // 同 IP 節流：間隔內同一 IP（含多分頁／多連線）只准發一則
     const lastIp = ipLastSent.get(ip);
     if (lastIp != null && now - lastIp < IP_INTERVAL_MS) {
       socket.emit('rate-limited');
@@ -218,11 +232,30 @@ io.on('connection', (socket) => {
     const text = sanitizeText(payload?.text);
     if (!text) return;
 
-    // 先消耗限流額度再過濾：洗版廣告即使被擋，一樣受 0.6s／令牌桶限速
+    // 先消耗限流額度再過濾：洗版廣告即使被擋，一樣受節流／令牌桶限速
     socket.data.tokens -= 1;
     ipLastSent.set(ip, now);
 
-    // 內容過濾（廣告／聯絡方式）：靜默丟棄，不回饋發送者。
+    // 洗同句偵測：以正規化後的句子比對（全形/拆字同句也算同一句）。
+    // 10 秒內同一句超過 DUP_LIMIT 次 → 罰冷靜 IP_PENALTY_MS。
+    const norm = normalize(text);
+    const rec = ipDup.get(ip);
+    if (rec && rec.norm === norm) {
+      rec.hits = rec.hits.filter((t) => now - t < DUP_WINDOW_MS);
+      rec.hits.push(now);
+      rec.ts = now;
+      if (rec.hits.length > DUP_LIMIT) {
+        rec.until = now + IP_PENALTY_MS;
+        rec.hits = [];
+        ch.blocked += 1;
+        socket.emit('rate-limited');
+        return;
+      }
+    } else {
+      ipDup.set(ip, { norm, hits: [now], ts: now });
+    }
+
+    // 內容過濾（廣告／聯絡方式／露骨色情）：靜默丟棄，不回饋發送者。
     // 發送者端已本地顯示自己的彈幕，等同影子封鎖——別人看不到，他也不知道被擋。
     if (!screen(text).ok) {
       ch.blocked += 1;

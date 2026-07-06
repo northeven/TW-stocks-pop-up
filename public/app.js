@@ -329,7 +329,7 @@
   // ---- 輸入 ----
 
   const sendBtn = form.querySelector('button[type="submit"]');
-  const SEND_COOLDOWN_MS = 600; // 與後端同 IP 節流一致：每 0.6 秒才能再發
+  const SEND_COOLDOWN_MS = 1200; // 與後端同 IP 節流一致：每 1.2 秒才能再發
   let onCooldown = false;
   let cooldownTimer;
 
