@@ -35,6 +35,7 @@
 
   const UP = '#f6465d';
   const DOWN = '#2ebd85';
+  const VOL_COLOR = 'rgba(88, 166, 255, 0.55)'; // 交易量用淺藍，與紅漲綠跌區隔
   const volFmt = new Intl.NumberFormat('zh-Hant-TW', { notation: 'compact', maximumFractionDigits: 1 });
   // 交易時段（當地時間、以分鐘計）：時間軸固定攤開整段，尚未成交的時間留白。
   const SESSION = channel === 'tsm'
@@ -156,7 +157,7 @@
       i === 0 ? ctx.moveTo(x(t), y(p)) : ctx.lineTo(x(t), y(p));
     }
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 1.1;
     ctx.lineJoin = 'round';
     ctx.stroke();
 
@@ -171,7 +172,7 @@
 
     // 最新價光點
     ctx.beginPath();
-    ctx.arc(x(t1), y(last), 3.5, 0, Math.PI * 2);
+    ctx.arc(x(t1), y(last), 2.2, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
 
@@ -188,8 +189,7 @@
         const nx = i + 1 < chartPoints.length ? x(chartPoints[i + 1][0]) : bx + 1;
         const bw = Math.max(1, nx - bx);
         const bh = (v / maxVol) * volH;
-        // 顏色跟著當筆漲跌走（相對昨收）
-        ctx.fillStyle = (chartPoints[i][1] >= chartPrevClose ? UP : DOWN) + '66';
+        ctx.fillStyle = VOL_COLOR;
         ctx.fillRect(bx, volBase - bh, bw, bh);
       }
       // 量能最大值標籤
