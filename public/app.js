@@ -77,21 +77,25 @@
     const priceH = ih - volH - volGap;
     const volBase = pad.top + ih; // 量能副圖的底線
 
-    const t0 = chartPoints[0][0];
     const t1 = chartPoints[chartPoints.length - 1][0];
     // 時間軸固定攤開整段交易時段，資料只填到「現在」；右側空白＝尚未到來的盤中時間，
     // tick 因此維持原本密度、不被拉伸。以最後一筆為基準換算當地分鐘，避免逐點做時區轉換。
     const lastMin = minutesOfDay(t1);
     const localMin = (t) => lastMin + (t - t1) / 60000;
-    let pMin = chartPrevClose;
-    let pMax = chartPrevClose;
+    // 第一個 tick 預留為昨收（畫在開盤時間點），一開盤就能看到初始漲跌折線
+    const openT = t1 + (SESSION.open - lastMin) * 60000;
+    const pts = [[openT, chartPrevClose], ...chartPoints];
+
+    // 垂直範圍以昨收為中心，預設預留上下 1.3%；當日振幅超過就對稱動態拉高，
+    // 讓昨收始終落在線圖正中央。
+    let maxDev = 0;
     for (const [, p] of chartPoints) {
-      if (p < pMin) pMin = p;
-      if (p > pMax) pMax = p;
+      const dev = Math.abs(p - chartPrevClose);
+      if (dev > maxDev) maxDev = dev;
     }
-    const span = Math.max(pMax - pMin, chartPrevClose * 0.001); // 避免整條平的除以零
-    pMin -= span * 0.08;
-    pMax += span * 0.08;
+    const half = Math.max(chartPrevClose * 0.013, maxDev * 1.08);
+    const pMin = chartPrevClose - half;
+    const pMax = chartPrevClose + half;
 
     const x = (t) => {
       const frac = (localMin(t) - SESSION.open) / (SESSION.close - SESSION.open);
@@ -150,10 +154,10 @@
       ctx.fillText(`昨收 ${chartPrevClose.toFixed(dec)}`, pad.left + 4, by - 9);
     }
 
-    // 走勢線 + 底下漸層填色
+    // 走勢線（含開盤昨收起點）+ 底下漸層填色
     ctx.beginPath();
-    for (let i = 0; i < chartPoints.length; i++) {
-      const [t, p] = chartPoints[i];
+    for (let i = 0; i < pts.length; i++) {
+      const [t, p] = pts[i];
       i === 0 ? ctx.moveTo(x(t), y(p)) : ctx.lineTo(x(t), y(p));
     }
     ctx.strokeStyle = color;
@@ -165,7 +169,7 @@
     grad.addColorStop(0, color + '2e');
     grad.addColorStop(1, color + '00');
     ctx.lineTo(x(t1), pad.top + priceH);
-    ctx.lineTo(x(t0), pad.top + priceH);
+    ctx.lineTo(x(openT), pad.top + priceH);
     ctx.closePath();
     ctx.fillStyle = grad;
     ctx.fill();
